@@ -40,7 +40,7 @@ sub populate_object {
 sub read_file {
     my ($self, $configuration) = @_;
 
-    die "Configuration file undefined" unless $self->{config_file};
+    return unless $self->{config_file};
     return unless -e $self->{config_file};
     
     unless (%cache) {
