@@ -9,6 +9,7 @@ use base qw(App::Filmore::ConfiguredObject);
 use IO::File;
 
 my %cache;
+our $VERSION = '0.01';
 
 #----------------------------------------------------------------------
 # Get hardcoded default parameter values

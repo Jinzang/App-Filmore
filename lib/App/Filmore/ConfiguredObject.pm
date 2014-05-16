@@ -4,6 +4,8 @@ use integer;
 
 package App::Filmore::ConfiguredObject;
 
+our $VERSION = '0.01';
+
 #----------------------------------------------------------------------
 # Create new object, configure fields, and create subobjects recursively
 
