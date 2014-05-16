@@ -5,8 +5,6 @@ use warnings;
 
 our $VERSION = "0.01";
 
-
-
 1;
 __END__
 
@@ -14,7 +12,7 @@ __END__
 
 =head1 NAME
 
-App::Filmore - It's new $module
+App::Filmore - Server side support for CGI scripting 
 
 =head1 SYNOPSIS
 
@@ -22,7 +20,9 @@ App::Filmore - It's new $module
 
 =head1 DESCRIPTION
 
-App::Filmore is ...
+App::Filmore is a collection of modules used to support cgi scripting on
+a web server. So far only the lowest level modules, which support reading
+object parameters from a configuration file, are done.
 
 =head1 LICENSE
 
