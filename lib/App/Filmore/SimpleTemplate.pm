@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-package SimpleTemplate;
+package App::Filmore::SimpleTemplate;
 
 use lib '../../../lib';
 use base qw(App::Filmore::ConfiguredObject);
@@ -18,6 +18,15 @@ use constant COMMANDS => {
                             else => '} else {',
                             endif => '}',
                          };
+#----------------------------------------------------------------------
+# Get hardcoded default parameter values
+
+sub parameters {
+	my ($pkg) = @_;
+
+	return ();
+}
+
 #----------------------------------------------------------------------
 # Compile a template into a subroutine which when called fills itself
 
@@ -171,7 +180,6 @@ sub parse_sections {
 
 sub slurp {
     my ($pkg, $input) = @_;
-    my $self = $pkg->new;
 
     my $in;
     local $/;
@@ -282,7 +290,7 @@ Compile one or more templates into a subroutine. A hash can then be rendered by
 calling the subroutine with it as the single argument:
 
     my $obj = SimpleTemplate->new;
-    my $sub = $self->compile_code($template_name, $subtemplate_name);
+    my $sub = $obj->compile_code($template_name, $subtemplate_name);
     my $output = &$sub(\%data);
 
 =item construct_code
