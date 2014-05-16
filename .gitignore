@@ -27,3 +27,5 @@ cover_db/
 MYMETA.*
 
 /App-Filmore-*
+
+test/
