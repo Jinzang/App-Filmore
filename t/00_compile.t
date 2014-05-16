@@ -12,6 +12,7 @@ unshift(@INC, $lib);
 
 use_ok $_ for qw(
     App::Filmore::ConfiguredObject
+    App::Filmore::ConfigFile
 );
 
 done_testing;
