@@ -118,15 +118,20 @@ App::Filmore::ConfiguredObject is the base class for configured objects
 =head1 SYNOPSIS
 
 	use App::Filmore::ConfiguredObject;
-    $obj = $pkg->new(par1 => 'val1', par2 => 'val2', );
+    $obj = $pkg->new(par1 => 'val1',
+                     par2 => 'val2',
+                     config_file => 'example.cfg');
 
 =head1 DESCRIPTION
 
-The class implements a dependency injection framework. It combines values
-passed as parameters with values read from a configuration file. Any subclass
-must implement the parameters method, which returns a hash containing the fields
-of the class and their default values. If the name of a field ends in '_ptr', it
-indicates that the field is a subobject.
+The class implements a dependency injection framework. It combines values passed
+as parameters with values read from a configuration file. Any subclass must
+implement the parameters method, which returns a hash containing the fields of
+the class and their default values. If the name of a field ends in '_ptr', it
+indicates that the field is a subobject. The value of the field ending in _ptr
+is the package implementing the subobject. Values of the parameters are taken
+from the argument list, then the configuration file, and finally from the
+parameters method in that order of priority.
 
 =head1 AUTHOR
 
