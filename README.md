@@ -1,6 +1,6 @@
 # NAME
 
-App::Filmore - It's new $module
+App::Filmore - Server side support for CGI scripting 
 
 # SYNOPSIS
 
@@ -8,7 +8,9 @@ App::Filmore - It's new $module
 
 # DESCRIPTION
 
-App::Filmore is ...
+App::Filmore is a collection of modules used to support cgi scripting on
+a web server. So far only the lowest level modules, which support reading
+object parameters from a configuration file, are done.
 
 # LICENSE
 
