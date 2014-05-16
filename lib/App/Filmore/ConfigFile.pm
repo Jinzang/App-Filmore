@@ -64,7 +64,6 @@ sub read_file {
         close($fd);
     }
     
-    
     %$configuration = (%cache, %$configuration);
     return;
 }
@@ -120,7 +119,9 @@ Configuration file lines are organized as lines containing
 
     NAME = VALUE
 
-and may contain blank lines or comment lines starting with a C<#>.
+and may contain blank lines or comment lines starting with a C<#>. The
+ConfguredObject class reads a configuration file to override default
+parameter values. 
 
 =head1 AUTHOR
 
