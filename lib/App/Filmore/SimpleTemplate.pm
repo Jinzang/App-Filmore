@@ -179,7 +179,7 @@ sub parse_sections {
 # Read a file into a string
 
 sub slurp {
-    my ($pkg, $input) = @_;
+    my ($self, $input) = @_;
 
     my $in;
     local $/;
