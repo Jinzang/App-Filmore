@@ -27,9 +27,35 @@ sub parameters {
 }
 
 #----------------------------------------------------------------------
-# Initialize the object by populating its parameters
+# Create the subobject contained in an object field
 
-sub initialize {
+sub create_object {
+	my ($self, $configuration, $field, $class) = @_;
+    return if $class && ref $class;
+
+    if ($class eq ref $self) {
+        $configuration->{$field} = $self;
+
+    } else {
+        $self->load_class($field, $class);
+        
+        if ($class->isa('App::Filmore::ConfiguredObject')) {
+            my $obj = bless({}, $class);
+            $configuration->{$field} = $obj;   
+            $obj->populate_object($configuration);
+    
+        } else {
+            $configuration->{$field} = $class->new();
+        }
+    }
+
+    return;
+}
+
+#----------------------------------------------------------------------
+# Set the default parameters for an object
+
+sub default_parameters {
     my ($pkg, $cycle) = @_;
 
     no strict 'refs';
@@ -41,7 +67,7 @@ sub initialize {
     my %parameters = $pkg->parameters();
     
     foreach my $subpkg (@{"${pkg}::ISA"}) {
-        %parameters = ($subpkg->initialize($cycle), %parameters);
+        %parameters = ($subpkg->default_parameters($cycle), %parameters);
     }
 
     return %parameters;    
@@ -51,7 +77,7 @@ sub initialize {
 # Load the file containing a class
 
 sub load_class {
-    my ($self, $class, $field) = @_;
+    my ($self, $field, $class) = @_;
 
 	# Untaint class name
 	my ($klass) = $class =~ /^(\w+(?:\:\:\w+)*)$/;
@@ -72,31 +98,22 @@ sub populate_object {
 	my ($self, $configuration) = @_;
 
     my $pkg = ref $self;
-	my %parameters = $pkg->initialize();
+	my %parameters = $pkg->default_parameters();
 
     # Recursively create subobjects
     
+    my $field = 'config_ptr';
+    my $class = $configuration->{$field} || $parameters{$field};
+    $self->create_object($configuration, $field, $class);
+
 	foreach my $field (keys %parameters) {
 		next unless $field =~ /_ptr$/;
-        next if exists $configuration->{$field} && ref $configuration->{$field};
+        next if $field eq 'config_ptr';
+
+        $class = $configuration->{$field} || $parameters{$field};
+        $self->create_object($configuration, $field, $class);
+    }
     
-        my $class = $configuration->{$field} || $parameters{$field};
-        if ($class eq $pkg) {
-            $configuration->{$field} = $self;
-            next;
-        }
-        
-        $self->load_class($class, $field);
-        if ($class->isa('App::Filmore::ConfiguredObject')) {
-            my $obj = bless({}, $class);
-            $configuration->{$field} = $obj;   
-            $obj->populate_object($configuration);
-
-        } else {
-            $configuration->{$field} = $class->new();
-        }
-	}
-
     # Populate object from configuration
     
 	foreach my $field (keys %parameters) {
