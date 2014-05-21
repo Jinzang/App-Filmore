@@ -8,8 +8,19 @@ use lib '../../../lib';
 use base qw(App::Filmore::ConfiguredObject);
 use IO::File;
 
-my %cache;
 our $VERSION = '0.01';
+
+#----------------------------------------------------------------------
+# Create new object, configure fields, and create subobjects recursively
+
+sub new {
+	my ($pkg, %configuration) = @_;
+    
+    my $self = bless({}, $pkg);
+	$self->populate_object(\%configuration);
+
+    return $self;
+}
 
 #----------------------------------------------------------------------
 # Get hardcoded default parameter values
@@ -23,7 +34,7 @@ sub parameters {
 }
 
 #----------------------------------------------------------------------
-# Set the configuration values from a file
+# Set the field values in a new object
 
 sub populate_object {
 	my ($self, $configuration) = @_;
@@ -31,7 +42,7 @@ sub populate_object {
     $self->SUPER::populate_object($configuration);
     $self->read_file($configuration);
     
-    return $self;
+    return;
 }
 
 #----------------------------------------------------------------------
@@ -40,31 +51,26 @@ sub populate_object {
 sub read_file {
     my ($self, $configuration) = @_;
 
-    return unless $self->{config_file};
-    return unless -e $self->{config_file};
+    return unless $self->{config_file} && -e $self->{config_file};
     
-    unless (%cache) {
-        my $fd = IO::File->new($self->{config_file}, 'r');
-        die "Couln't read $self->{config_file}: $!" unless $fd;
-        
-        while (my $line = <$fd>) {
-            # Ignore comments and blank lines
-            next if $line =~ /^\s*\#/ || $line !~ /\S/;
+    my $fd = IO::File->new($self->{config_file}, 'r');
+    die "Couln't read $self->{config_file}: $!" unless $fd;
     
-            # Split line into name and value, remove leading and
-            # trailing whitespace
-    
-            my ($name, $value) = split (/\s*=\s*/, $line, 2);
-            die "Bad line in config file: ($name)" unless defined $value;
-    
-            $value =~ s/\s+$//;
-            $cache{$name} = $value;
-        }
+    while (my $line = <$fd>) {
+        # Ignore comments and blank lines
+        next if $line =~ /^\s*\#/ || $line !~ /\S/;
 
-        close($fd);
+        # Split line into name and value, remove leading and
+        # trailing whitespace
+
+        my ($name, $value) = split (/\s*=\s*/, $line, 2);
+        die "Bad line in config file: ($name)" unless defined $value;
+
+        $value =~ s/\s+$//;
+        $configuration->{$name} = $value;
     }
-    
-    %$configuration = (%cache, %$configuration);
+
+    close($fd);
     return;
 }
 
@@ -78,8 +84,6 @@ sub write_file {
     
     my $fd = IO::File->new($self->{config_file}, 'w');
     die "Couln't read $self->{config_file}: $!" unless $fd;
-
-    undef %cache;
     
     my $pkg = ref $self;
     my %parameters = $pkg->parameters();
