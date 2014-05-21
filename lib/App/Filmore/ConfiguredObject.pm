@@ -72,8 +72,8 @@ sub default_parameters {
     $cycle->{$pkg} = 1;
     my %parameters = $pkg->parameters();
     
-    foreach my $subpkg (@{"${pkg}::ISA"}) {
-        %parameters = ($subpkg->default_parameters($cycle), %parameters);
+    foreach my $super (@{"${pkg}::ISA"}) {
+        %parameters = ($super->default_parameters($cycle), %parameters);
     }
 
     return %parameters;    
