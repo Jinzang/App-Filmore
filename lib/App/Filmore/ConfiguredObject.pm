@@ -6,15 +6,20 @@ package App::Filmore::ConfiguredObject;
 
 our $VERSION = '0.01';
 
+use Scalar::Util qw(blessed weaken);
+
 #----------------------------------------------------------------------
 # Create new object, configure fields, and create subobjects recursively
 
 sub new {
 	my ($pkg, %configuration) = @_;
     
-	my $self = bless({}, $pkg);
+	my $self = bless({}, 'App::Filmore::ConfiguredObject');
 	$self->populate_object(\%configuration);
     
+    $self = bless($self, $pkg);
+	$self->populate_object(\%configuration);
+
     return $self;
 }
 
@@ -31,21 +36,22 @@ sub parameters {
 
 sub create_object {
 	my ($self, $configuration, $field, $class) = @_;
-    return if $class && ref $class;
 
-    if ($class eq ref $self) {
-        $configuration->{$field} = $self;
+    if ($class && ! blessed $class) {
+        if ($class eq ref $self) {
+            $configuration->{$field} = $self;
 
-    } else {
-        $self->load_class($field, $class);
-        
-        if ($class->isa('App::Filmore::ConfiguredObject')) {
-            my $obj = bless({}, $class);
-            $configuration->{$field} = $obj;   
-            $obj->populate_object($configuration);
-    
         } else {
-            $configuration->{$field} = $class->new();
+            $self->load_class($field, $class);
+            
+            if ($class->isa('App::Filmore::ConfiguredObject')) {
+                my $obj = bless({}, $class);
+                $configuration->{$field} = $obj;   
+                $obj->populate_object($configuration);
+        
+            } else {
+                $configuration->{$field} = $class->new();
+            }
         }
     }
 
@@ -102,15 +108,10 @@ sub populate_object {
 
     # Recursively create subobjects
     
-    my $field = 'config_ptr';
-    my $class = $configuration->{$field} || $parameters{$field};
-    $self->create_object($configuration, $field, $class);
-
 	foreach my $field (keys %parameters) {
 		next unless $field =~ /_ptr$/;
-        next if $field eq 'config_ptr';
 
-        $class = $configuration->{$field} || $parameters{$field};
+        my $class = $configuration->{$field} || $parameters{$field};
         $self->create_object($configuration, $field, $class);
     }
     
