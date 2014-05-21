@@ -112,7 +112,7 @@ sub build_field {
          $field = hidden(%$args);
     } elsif ($item->{type} eq 'popup') {
         $args->{"-default"} ||= $args->{"-value"};
-        $field = popup_menu(%$args);
+        $field = popup_menu($args->{-name}, $args->{-values}, $args->{-value});
     } elsif ($item->{type} eq 'radio') {
         $args->{"-value"} = [$item->{value}];
         $field = radio_group(%$args);

@@ -258,12 +258,13 @@ do {
 
     delete $item->{type};
     delete $item->{style};
+    delete $item->{limits};
     $item->{valid} = 'string|bar|biz|baz|';
 	$fh->parse_validator($item);
     
 	$field = $fh->build_field($item);
 	my $r = <<EOQ;
-<select name="foo" id="foo-field">
+<select name="foo" >
 <option selected="selected" value="bar">bar</option>
 <option value="biz">biz</option>
 <option value="baz">baz</option>
