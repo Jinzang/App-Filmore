@@ -242,18 +242,18 @@ do {
 
 	$fh->parse_validator($item);
 	my $field = $fh->build_field($item);
-	is($field, '<input type="text" name="foo" value="bar" id="foo-field" />',
+	is($field, '<input type="text" name="foo" value="bar" />',
 	   "Form text field"); # Test 39
 
     $item->{type} = 'textarea';
 	$field = $fh->build_field($item);
-	is($field, '<textarea name="foo" id="foo-field">bar</textarea>',
+	is($field, '<textarea name="foo" >bar</textarea>',
 	   "Form textarea"); # Test 40
 
     $item->{style} = 'rows=20;cols=64';
 	$field = $fh->build_field($item);
 	is($field,
-	   '<textarea name="foo" rows="20" cols="64" id="foo-field">bar</textarea>',
+	   '<textarea name="foo" rows="20" cols="64">bar</textarea>',
 	   "Form textarea with style"); # Test 41
 
     delete $item->{type};

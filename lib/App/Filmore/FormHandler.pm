@@ -81,7 +81,6 @@ sub build_field {
     
     $args->{"-value"} = $item->{value};
     $args->{"-name"} = $item->{name};
-    $args->{"-id"} = "$item->{name}-field";
 
     my @pairs = split(/;/, $item->{style});
     foreach my $pair (@pairs) {
