@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 use strict;
 
-use Test::More tests => 42;
+use Test::More tests => 41;
 
 use Cwd;
 use IO::File;
@@ -18,7 +18,11 @@ pop(@path);
 my $lib = catdir(@path, 'lib');
 unshift(@INC, $lib);
 
+$lib = catdir(@path, 't');
+unshift(@INC, $lib);
+
 require App::Filmore::FormHandler;
+require MinMax;
 
 my $base_dir = catdir(@path, 'test');
 
@@ -28,7 +32,7 @@ chdir $base_dir;
 $base_dir = getcwd();
 
 my $config_file = "$base_dir/config.cfg";
-my $fh = App::Filmore::FormHandler->new(responder_ptr => 'App::Filmore::MailHandler');
+my $fh = App::Filmore::FormHandler->new(code_ptr => 'MinMax');
 
 #----------------------------------------------------------------------
 # Create object
@@ -68,13 +72,9 @@ do {
 	$fh->parse_validator($item);
 	is_deeply($item, $item_ok, "Required number validator"); # Test 6
 
-    $item->{value} = '';
-	my $b = $fh->validate($item);
-	is($b, 1, "Validate empty required number"); # Test 7
-
     $item->{value} = '23';
 	$b = $fh->validate($item);
-	is($b, undef, "Validate required naumber"); # Test 8
+	is($b, undef, "Validate required naumber"); # Test 7
 };
 
 do {
@@ -83,15 +83,15 @@ do {
                    datatype => 'string'};
     
 	$fh->parse_validator($item);
-	is_deeply($item, $item_ok, "String regexp"); # Test 9
+	is_deeply($item, $item_ok, "String regexp"); # Test 8
 
     $item->{value} = '$317.43';
 	my $b = $fh->validate($item);
-	is($b, '', "Validate valid regexp string"); # Test 10
+	is($b, '', "Validate valid regexp string"); # Test 9
 
     $item->{value} = '$24';
 	$b = $fh->validate($item);
-	is($b, 1, "Validate invalid regexp string"); # Test 11
+	is($b, 1, "Validate invalid regexp string"); # Test 10
 };
 
 do {
@@ -100,15 +100,15 @@ do {
                    datatype => 'string'};
     
 	$fh->parse_validator($item);
-	is_deeply($item, $item_ok, "String selector"); # Test 12
+	is_deeply($item, $item_ok, "String selector"); # Test 11
 
     $item->{value} = 'jack';
 	my $b = $fh->validate($item);
-	is($b, undef, "Validate valid selector string"); # Test 13
+	is($b, undef, "Validate valid selector string"); # Test 12
     
     $item->{value} = 'jason';
 	$b = $fh->validate($item);
-	is($b, 1, "Validate invalid selector string"); # Test 14
+	is($b, 1, "Validate invalid selector string"); # Test 13
 };
 
 do {
@@ -117,15 +117,15 @@ do {
                    selection => '10|20|30'};
     
 	$fh->parse_validator($item);
-	is_deeply($item, $item_ok, "Number selector"); # Test 15
+	is_deeply($item, $item_ok, "Number selector"); # Test 14
 
     $item->{value} = '10.0';
 	my $b = $fh->validate($item);
-	is($b, undef, "Validate valid number selector string"); # Test 16
+	is($b, undef, "Validate valid number selector string"); # Test 15
 
     $item->{value} = '15';
 	$b = $fh->validate($item);
-	is($b, 1, "Validate invalid number selector string"); # Test 17
+	is($b, 1, "Validate invalid number selector string"); # Test 16
 };
 
 do {
@@ -134,23 +134,23 @@ do {
                    limits => '[10,30]'};
 
 	$fh->parse_validator($item);
-	is_deeply($item, $item_ok, "Number limits"); # Test 18
+	is_deeply($item, $item_ok, "Number limits"); # Test 17
 
     $item->{value} = '10.0';
 	my $b = $fh->validate($item);
-	is($b, undef, "Validate lower numeric limit string"); # Test 19
+	is($b, undef, "Validate lower numeric limit string"); # Test 18
 
     $item->{value} = '15.0';
 	$b = $fh->validate($item);
-	is($b, undef, "Validate intermediate numeric limit string"); # Test 20
+	is($b, undef, "Validate intermediate numeric limit string"); # Test 19
 
     $item->{value} = '20.0';
 	$b = $fh->validate($item);
-	is($b, undef, "Validate upper numeric limit string"); # Test 21
+	is($b, undef, "Validate upper numeric limit string"); # Test 20
 
     $item->{value} = '5';
 	$b = $fh->validate($item);
-	is($b, 1, "Validate outside numeric limit string"); # Test 22
+	is($b, 1, "Validate outside numeric limit string"); # Test 21
 };
 
 do {
@@ -159,23 +159,23 @@ do {
                    limits => '(10,30)'};
 
 	$fh->parse_validator($item);
-	is_deeply($item, $item_ok, "Open numeric limits"); # Test 23
+	is_deeply($item, $item_ok, "Open numeric limits"); # Test 22
 
     $item->{value} = '10.0';
 	my $b = $fh->validate($item);
-	is($b, 1, "Validate lower open numeric limit string"); # Test 24
+	is($b, 1, "Validate lower open numeric limit string"); # Test 23
 
     $item->{value} = '15.0';
 	$b = $fh->validate($item);
-	is($b, undef, "Validate intermediate open numeric limit string"); # Test 25
+	is($b, undef, "Validate intermediate open numeric limit string"); # Test 24
 
     $item->{value} = '20.0';
 	$b = $fh->validate($item);
-	is($b, undef, "Validate upper open numeric limit string"); # Test 26
+	is($b, undef, "Validate upper open numeric limit string"); # Test 25
 
     $item->{value} = '5';
 	$b = $fh->validate($item);
-	is($b, 1, "Validate outside numeric limit string"); # Test 27
+	is($b, 1, "Validate outside numeric limit string"); # Test 26
 };
 
 do {
@@ -184,19 +184,19 @@ do {
                    limits => '(0,)'};
 
 	$fh->parse_validator($item);
-	is_deeply($item, $item_ok, "Open numeric one sided limits"); # Test 28
+	is_deeply($item, $item_ok, "Open numeric one sided limits"); # Test 27
 
     $item->{value} = '0.0';
 	my $b = $fh->validate($item);
-	is($b, 1, "Validate lower open one sided numeric limit string"); # Test 29
+	is($b, 1, "Validate lower open one sided numeric limit string"); # Test 28
 
     $item->{value} = '5.0';
 	$b = $fh->validate($item);
-	is($b, undef, "Validate intermediate open one sided numeric limit string"); # Test 30
+	is($b, undef, "Validate intermediate open one sided numeric limit string"); # Test 29
 
     $item->{value} = '-10';
 	$b = $fh->validate($item);
-	is($b, 1, "Validate outside numeric limit string"); # Test 31
+	is($b, 1, "Validate outside numeric limit string"); # Test 30
 };
 
 do {
@@ -205,19 +205,19 @@ do {
                    limits => '[,9]'};
 
 	$fh->parse_validator($item);
-	is_deeply($item, $item_ok, "Closed numeric one sided limits"); # Test 32
+	is_deeply($item, $item_ok, "Closed numeric one sided limits"); # Test 31
 
     $item->{value} = '5.0';
 	my $b = $fh->validate($item);
-	is($b, undef, "Validate intermediate closed one sided numeric limit string"); # Test 33
+	is($b, undef, "Validate intermediate closed one sided numeric limit string"); # Test 32
 
     $item->{value} = '9.0';
 	$b = $fh->validate($item);
-	is($b, undef, "Validate upper closed one sided numeric limit string"); # Test 34
+	is($b, undef, "Validate upper closed one sided numeric limit string"); # Test 33
 
     $item->{value} = '10';
 	$b = $fh->validate($item);
-	is($b, 1, "Validate outside closed numeric limit string"); # Test 35
+	is($b, 1, "Validate outside closed numeric limit string"); # Test 34
 };
 
 do {
@@ -226,15 +226,15 @@ do {
                    limits => '[5,]'};
 
 	$fh->parse_validator($item);
-	is_deeply($item, $item_ok, "String one sided limits"); # Test 36
+	is_deeply($item, $item_ok, "String one sided limits"); # Test 35
 
     $item->{value} = '12345';
 	my $b = $fh->validate($item);
-	is($b, undef, "Validate valid string length"); # Test 37
+	is($b, undef, "Validate valid string length"); # Test 36
 
     $item->{value} = '1234';
 	$b = $fh->validate($item);
-	is($b, 1, "Validate invalid string length"); # Test 38
+	is($b, 1, "Validate invalid string length"); # Test 37
 };
 
 do {
@@ -243,18 +243,18 @@ do {
 	$fh->parse_validator($item);
 	my $field = $fh->build_field($item);
 	is($field, '<input type="text" name="foo" value="bar" />',
-	   "Form text field"); # Test 39
+	   "Form text field"); # Test 38
 
     $item->{type} = 'textarea';
 	$field = $fh->build_field($item);
 	is($field, '<textarea name="foo" >bar</textarea>',
-	   "Form textarea"); # Test 40
+	   "Form textarea"); # Test 39
 
     $item->{style} = 'rows=20;cols=64';
 	$field = $fh->build_field($item);
 	is($field,
 	   '<textarea name="foo" rows="20" cols="64">bar</textarea>',
-	   "Form textarea with style"); # Test 41
+	   "Form textarea with style"); # Test 40
 
     delete $item->{type};
     delete $item->{style};
@@ -271,5 +271,5 @@ do {
 </select>
 EOQ
 	chomp $r;
-	is($field, $r, "Form selection"); # Test 42
+	is($field, $r, "Form selection"); # Test 41
 };

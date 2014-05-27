@@ -11,25 +11,6 @@ use lib '../lib';
 use base qw(App::Filmore::ConfiguredObject);
 
 #----------------------------------------------------------------------
-# Check request
-
-sub check {
-    my ($self, $request) = @_;
-
-    my $error;
-    if (exists $request->{value}) {
-        $error = "Value out of bounds"
-            if $request->{value} < $self->{min} ||
-               $request->{value} > $self->{max};
-    } else {
-        $error = "Value not set";
-    }
-
-    die $error if $error;
-    return $error;
-}
-
-#----------------------------------------------------------------------
 # Set default parameters
 
 sub parameters {
@@ -44,38 +25,57 @@ sub parameters {
 }
 
 #----------------------------------------------------------------------
-# Check request
+# Return info about form parameters
 
-sub query {
-    my ($self, $error) = @_;
+sub info_data {
+    my ($self, $response) = @_;
 
-    my $response = {};
-    $response->{result} = "$error value?";
+    my %info = (name => 'value',
+                msg => 'Value out of bounds',
+                valid=>"&int[$self->{min},$self->{max}]"
+                );
 
-    return $response;
+    return [\%info];
 }
 
 #----------------------------------------------------------------------
+# Read data associated with a form
+
+sub read_data {
+    my ($self, $response) = @_;
+    return;
+}
+
+#----------------------------------------------------------------------
+# Return the template used to render the result
+
+sub template_data {
+    my ($self, $response) = @_;
+
+    return <<'EOQ';
+<html>
+<head><title>MinMax</title></head>
+<body><p>$msg</p></body>
+</html>
+EOQ
+}
+
+#----------------------------------------------------------------------
+# Validate the data in the response
+
+sub validate_data {
+    my ($self, $response) = @_;
+    return;
+}
+    
+#----------------------------------------------------------------------
 # Run the handler
 
-sub run {
-    my ($self, $request) = @_;
+sub write_data {
+    my ($self, $response) = @_;
 
-    my $response;
-    my $error = $self->check($request);
-
-    if ($error) {
-        $response->{code} = 400;
-        $response->{msg} = $error;
-        $response->{results} = $self->query($error);
-
-    } else {
-        $response->{code} = 200;
-        $response->{msg} = 'OK';        
-        $response->{results} = "Value in bounds";
-    }
-
-    return $response;
+    $response->{msg} = "Value in bounds";
+    return;
 }
 
 1;

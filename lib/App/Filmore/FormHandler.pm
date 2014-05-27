@@ -21,17 +21,11 @@ sub parameters {
     my ($pkg) = @_;
     
     return (
-        base_directory => '',
-        base_url => '',
-        form_extension => 'form',
-        field_extension => 'field',
-        web_extension => 'html',
+        site_template => '',
         body_tag => 'content',
-        template_directory => 'templates',
-        bad_message => 'One or more fields in the form are incorrect: $bad_fields',
-        ok_message => 'Your edited page has been sent for review. Return to the <a href="$url">unedited page</a>.',
+        web_extension => 'html',
         template_ptr => 'App::Filmore::SimpleTemplate',
-        responder_ptr => '',
+        code_ptr => '',
     );
 }
 
@@ -41,21 +35,44 @@ sub parameters {
 sub run {
     my ($self, $request) = @_;
 
-    my $response = $self->initialize_response($request);
+    my $response = {};
+    %$response = %$request;
+
+    $response->{items} = $self->{code_ptr}->get_info($response);
+    $self->update_response_items($response, $request);
 
     my $redirect;
-    eval{$redirect = $self->generate_response($response)};
-    $response->{message} = $@ if $@;
+    eval{
+        if (lc($response->{cmd}) eq 'cancel') {
+            $redirect = 1;
+    
+        } elsif (exists $response->{cmd}) {
+            if ($self->validate_items($response)) {
+                $redirect = $self->write_data($response);
+            }
+    
+        } else {
+            $self->read_data($response);        
+            $self->update_response_items($response);
+        }
+    };
+
+    $response->{msg} = $@ if $@;
     
     # Redirect back to edited page if flag is set
-    
+    # otherwise generate the form
+
     if ($redirect) {
-        print "Location: $response->{url}\n\n";
-        return;
+        $response->{code} = 302;
+        $response->{msg} ||= 'Found';
+
+    } else {
+        $response->{code} = 200;
+        $response->{msg} ||= '';
+        $response->{results} = $self->build_form($response);
     }
 
-    my $output = $self->build_form($response);
-    return $output;
+    return $response;
 }
 
 #----------------------------------------------------------------------
@@ -133,31 +150,17 @@ sub build_form {
     $response = $self->build_form_fields($response);
 
     # Figure out which templates we have
-    
-    my $text = $self->read_template($response, $self->{form_extension});
-    my $section = $self->{template_ptr}->parse_sections($text);
 
-    # Substitute any sections in the response into the template
-    
-    my $changed;
-    foreach my $field (keys %$section) {
-        next unless exists $response->{$field};
-        
-        $section->{$field} = $response->{$field};
-        $changed = 1;
-    }
-    
-    # Reconstruct the template if a section was changed
-    
-    $text = $self->{template_ptr}->substitute_sections($text, $section)
-        if $changed;
+    my @templates;   
+    push(@templates, $self->{site_template}) if $self->{site_template};
+    push(@templates, $self->template_data($response));
 
-    # Generate output page and print it
+    # Generate page
 
-    my $sub = $self->{template_ptr}->construct_code($text);
-    my $output = &$sub($response);
+    my $sub = $self->{template_ptr}->compile_code(@templates);
+    my $results = &$sub($response);
 
-    return $output;
+    return $results;
 }
 
 #---------------------------------------------------------------------------
@@ -177,43 +180,19 @@ sub build_form_fields {
 }
 
 #----------------------------------------------------------------------
-# Build the complete web page from the response body field
+# Get the info about the fields to be displayed in the form
 
-sub build_web_page {
-    my ($self, $response) = @_;
-
-    my $filename = $self->url_to_filename($response->{url});
-    my $text = $self->slurp($filename);
-    
-    my $section = {$response->{body_tag} => $response->{body}};
-    return $self->{template_ptr}->substitute_sections($text, $section);
-}
-
-#----------------------------------------------------------------------
-# Generate the response, either a form or mail message
-
-sub generate_response {
+sub info_data {
     my ($self, $response) = @_;
     
-    if (! $self->valid_url($response->{url})) {
-        $response->{url} = $response->{base_url};
-        return 1;
-    }
-    
-    if ($response->{cmd} eq 'Cancel') {
-        return 1;
+    my $info;
+    if ($self->{code_ptr}->can('info_data')) {
+        $info = $self->{code_ptr}->info_data($response);
+    } else {
+        die "No info about form fields";
     }
 
-    if ($response->{cmd} eq 'Mail') {
-        if ($self->validate_items($response)) {
-            $self->{responder_ptr}->run($response);
-            $response->{message} = $response->{ok_message};
-            return;
-        }
-    }
-    
-    $self->populate_items($response);    
-    return;
+    return $info;
 }
 
 #----------------------------------------------------------------------
@@ -287,34 +266,6 @@ sub get_info {
 }
 
 #----------------------------------------------------------------------
-# Initialize the response hash from the request
-
-sub initialize_response {
-    my ($self, $request) = @_;
-    
-    my @response_items;
-    my %response = %$request;
-    $response{items} = $self->get_info(\%response);
-
-    foreach my $item (@{$response{items}}) {
-        my $field = $item->{name};
-        $response{$field} = exists $request->{$field}
-                              ? $request->{$field} : '';
-
-        $item->{value} = $request->{$field};
-        push(@response_items, $item);
-    }
-
-    $response{base_url} =~ s!/[^/]*$!!;
-
-    my $base_directory = $self->{base_directory} || cwd();
-    $response{script_file} = join('/', $response{base_url},
-                               splitdir(abs2rel($0, $base_directory)));
-    
-    return \%response;
-}
-
-#----------------------------------------------------------------------
 # Parse the validaion expression
 
 sub parse_validator {
@@ -367,58 +318,34 @@ sub populate_items {
 
     return;
 }
- 
-#----------------------------------------------------------------------
-# Read a template from the templates directory
-
-sub read_template {
-    my ($self, $response, $ext) = @_;
-
-    my ($dir, $script_name) = $self->split_filename($0);
-    my ($script_base, $script_ext) = split(/\./, $script_name);
-
-    my $template_name = catfile($self->{template_directory},
-                                "$script_base.$ext");
-    
-    my $template = $self->slurp($template_name);
-    die "Couldn't read template: $template_name" unless length $template;
-    
-    return $template;
-}
 
 #----------------------------------------------------------------------
-# Read a file into a string
+# Read the data to be displayed in the form
 
-sub slurp {
-    my ($self, $input) = @_;
-
-    my $in;
-    local $/;
-
-    if (ref $input) {
-        $in = $input;
-    } else {
-        $in = IO::File->new ($input);
-        return '' unless defined $in;
+sub read_data {
+    my ($self, $response) = @_;
+    
+    if ($self->{code_ptr}->can('read_data')) {
+        $self->{code_ptr}->read_data($response);
     }
-
-    my $text = <$in>;
-    $in->close;
-
-    return $text;
+    
+    return;
 }
 
 #----------------------------------------------------------------------
-# Split off basename from rest of filename
+# Get the subtemplate used to render the file
 
-sub split_filename {
-    my ($self, $filename) = @_;
-
-    my @dirs = splitdir($filename);
-    my $basename = pop(@dirs);
-
-    my $dir = catfile(@dirs) || '';
-    return ($dir, $basename);
+sub template_data {
+    my ($self, $response) = @_;
+    
+    my $subtemplate;
+    if ($self->{code_ptr}->can('template_data')) {
+        $subtemplate = $self->{code_ptr}->template_data($response);
+    } else {
+        die "No template data";
+    }
+    
+    return $subtemplate;
 }
 
 #----------------------------------------------------------------------
@@ -430,6 +357,27 @@ sub trim_value {
     $value =~ s/^\s+//;
     $value =~ s/\s+$//;
     return $value;
+}
+
+#----------------------------------------------------------------------
+# Initialize the response hash from the request
+
+sub update_response_items {
+    my ($self, $response, $request) = @_;
+    $request = $response unless defined $request;
+    
+    foreach my $item (@{$response->{items}}) {
+        my $field = $item->{name};
+        if (exists $request->{$field}) {
+            $item->{value} = $request->{$field};
+
+        } else {
+            $response->{$field} = '';
+            $item->{value} = '';
+        }
+    }
+   
+    return;
 }
 
 #----------------------------------------------------------------------
@@ -627,12 +575,23 @@ sub validate {
                  && ! $self->valid_string_selection($item);
 
         $bad ||= $item->{regexp} && ! $self->valid_regexp($item);
-
-    } else {
-        $bad = $item->{required};
     }
         
     return $bad;
+}
+
+#----------------------------------------------------------------------
+# Call method to validate response if it is present
+
+sub validate_data {
+    my ($self, $response) = @_;
+    
+    my $msg;
+    if ($self->{code_ptr}->can('validate_data')) {
+        $msg = $self->{code_ptr}->validate_data($response);
+    }
+    
+    return $msg;
 }
 
 #----------------------------------------------------------------------
@@ -641,18 +600,38 @@ sub validate {
 sub validate_items {
     my ($self, $response) = @_;
 
-    my @bad_fields;
+    my @message;
     foreach my $item (@{$response->{items}}) {
-        my $bad = $self->validate($item);
-        push(@bad_fields, $item->{name}) if $bad;
+        my $msg;
+        if ($item->{required} && length $item->{value} == 0) {
+            $msg = "Required field $item->{name} is missing";
+
+        } elsif ($self->validate($item)) {
+            $msg = $item->{msg} || "Invalid data in $item->{name} field";
+        }
+
+        push(@message, $msg) if $msg;
     }
 
-    if (@bad_fields) {
-        $response->{bad_fields} = join(',', @bad_fields);
-        $response->{message} = $self->{bad_message};
-    }
+    my $msg = $self->validate_data($response);
+    push(@message, $msg) if $msg;
+    
+    $response->{msg} = join("<br>\n", @message) if @message;
+    return @message ? 0 : 1;
+}
 
-    return @bad_fields ? 0 : 1;
+#----------------------------------------------------------------------
+# Call method to write data
+
+sub write_data {
+    my ($self, $response) = @_;
+    
+    my $redirect;
+    if ($self->{code_ptr}->can('write_data')) {
+        $redirect = $self->{code_ptr}->write_data($response);
+    }
+    
+    return $redirect;
 }
 
 1;
