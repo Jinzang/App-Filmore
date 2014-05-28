@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 use strict;
 
-use Test::More tests => 41;
+use Test::More tests => 45;
 
 use Cwd;
 use IO::File;
@@ -272,4 +272,32 @@ do {
 EOQ
 	chomp $r;
 	is($field, $r, "Form selection"); # Test 41
+};
+
+do {
+    my $request = {
+                   script_url => 'http://www.example.com/test.cgi',
+                   cmd => 'Check',
+                   };
+    
+    $request->{value} = 7;
+    my $response = $fh->run($request);
+    like($response->{results}, qr/Value in bounds/,
+         "Run valid request"); # test 42
+    
+    $request->{value} = 25;
+    $response = $fh->run($request);
+    like($response->{results}, qr/Value out of bounds/,
+         "Run invalid request"); # test 43
+    
+    delete $request->{value};
+    $response = $fh->run($request);
+    like($response->{results}, qr/Required field value is missing/,
+         "Run empty request"); # test 44
+    
+    delete $request->{cmd};
+    $response = $fh->run($request);
+    like($response->{results}, qr/Please enter a value/,
+         "Run request with no commands"); # test 45
+    
 };

@@ -43,6 +43,8 @@ sub info_data {
 
 sub read_data {
     my ($self, $response) = @_;
+    
+    $response->{msg} = "Please enter a value";
     return;
 }
 
