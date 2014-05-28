@@ -38,19 +38,18 @@ sub run {
     my $response = {};
     %$response = %$request;
 
-    $response->{items} = $self->{code_ptr}->get_info($response);
+    $response->{items} = $self->{code_ptr}->info_data($response);
     $self->update_response_items($response, $request);
 
     my $redirect;
     eval{
-        if (lc($response->{cmd}) eq 'cancel') {
-            $redirect = 1;
-    
-        } elsif (exists $response->{cmd}) {
-            if ($self->validate_items($response)) {
+        if (exists $response->{cmd}) {
+            if (lc($response->{cmd}) eq 'cancel') {
+                $redirect = 1;
+            } elsif ($self->validate_items($response)) {
                 $redirect = $self->write_data($response);
-            }
-    
+            } 
+
         } else {
             $self->read_data($response);        
             $self->update_response_items($response);
@@ -193,76 +192,6 @@ sub info_data {
     }
 
     return $info;
-}
-
-#----------------------------------------------------------------------
-# Get info about form mail application
-
-sub get_info {
-    my ($self, $response) = @_;
-
-    my $id;
-    my $field;
-
-    my $item;
-    my %prior;
-    my @items;
-    
-    my $text = $self->read_template($response, $self->{field_extension});
-    my @lines = split(/\n/, $text);
-    
-    while (defined($_ = shift @lines)) {
-        if (/^\s*#/) {
-            # Comment line
-            undef $field;
-            
-        } elsif (/^\s*\[([^\]]*)\]/) {
-            if (defined $id) {
-                push(@items, $item);
-            } else {
-                die "No field defined for info";
-            }
-            $item = {};
-            
-            # new id
-            $id = lc($1);
-            if (exists $prior{$id}) {                
-                die "Duplicate ids: $id\n" 
-            } else {
-                $prior{$id} = 1;
-                $item->{name} = $id;
-            }
-
-        } elsif (/^[A-Z_]+\s*=/) {
-            # new field definition
-            my $value;
-            ($field, $value) = split (/\s*=\s*/, $_, 2);
-            $field = lc($field);
-            $value =~ s/\s+$//;
-            
-            if (exists $item->{$field}) {
-                if (ref $item->{$field}) {
-                    push(@{$item->{$field}}, $value);
-                } else {
-                    $item->{$field} = [$item->{$field}, $value];
-                }
-
-            } else {
-                $item->{$field} = $value;
-            }
-
-        } else {
-            # continuation of info field
-            die "Undefined field\n" . substr($_, 20) . "\n"
-                unless defined $field;
-
-            s/\s+$//;    
-            $item->{$field} .= "\n$_";
-        }
-    }
-
-    push(@items, $item) if %$item;    
-    return \@items;
 }
 
 #----------------------------------------------------------------------
@@ -602,6 +531,8 @@ sub validate_items {
 
     my @message;
     foreach my $item (@{$response->{items}}) {
+        $self->parse_validator($item);
+
         my $msg;
         if ($item->{required} && length $item->{value} == 0) {
             $msg = "Required field $item->{name} is missing";

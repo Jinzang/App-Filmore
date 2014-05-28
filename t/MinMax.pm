@@ -55,7 +55,15 @@ sub template_data {
     return <<'EOQ';
 <html>
 <head><title>MinMax</title></head>
-<body><p>$msg</p></body>
+<body><p>$msg</p>
+<form action="$script_url">
+<!-- for @items -->
+<div><b>$title</b></div>
+<div>$field</div>
+<!-- endfor -->
+<input type="submit" name="cmd" value="Cancel">
+<input type="submit" name="cmd" value="Check">
+</body>
 </html>
 EOQ
 }
