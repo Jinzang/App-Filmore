@@ -12,8 +12,7 @@ use base qw(App::Filmore::ConfiguredObject);
 use IO::File;
 
 use Data::Dumper;
-use File::Spec::Functions qw(rel2abs);
-
+use File::Spec::Functions qw(abs2rel rel2abs splitdir);
 
 #----------------------------------------------------------------------
 # Configuration
@@ -55,6 +54,23 @@ sub parameters {
             protocol => 'text/html',
             form_ptr => 'App::Filmore::FormHandler',
 	);
+}
+
+#----------------------------------------------------------------------
+# Run the cgi script, print the result
+
+sub run {
+    my ($self, %args) = @_;
+
+    my $request = $self->request(%args);
+    my $result = $self->response($request);
+
+    if (! %args) {
+        print "Content-type: $self->{protocol}\n\n";
+        print $result;
+    }
+
+    return $result;
 }
 
 #----------------------------------------------------------------------
@@ -124,6 +140,39 @@ sub error {
 }
 
 #----------------------------------------------------------------------
+# Parse a url into its components
+
+sub parse_url {
+    my ($self, $url) = @_;
+
+    my %parsed_url = (method => 'http:', domain => '', path => '', file => '');    
+    my ($method, $rest) = split(m!//!, $url, 2);
+
+    unless (defined $rest) {
+        $rest = $method;
+    } else {
+        $parsed_url{method} = $method;
+    }
+    
+
+    if ($rest) {
+        my @path = split(m!/!, $rest);
+
+        if (@path) { 
+            if ($path[0] =~ /\.(com|org|edu|us)$/) {
+                $parsed_url{domain} = $path[0];
+                $path[0] = '';
+            }
+            
+            $parsed_url{file} = pop(@path) if $path[-1] =~ /\./;
+            $parsed_url{path} = join('/', @path);
+        }
+    }
+    
+    return \%parsed_url;
+}
+
+#----------------------------------------------------------------------
 # Read selected environment variables into request
 
 sub read_env {
@@ -150,11 +199,10 @@ sub read_urls {
 
     if (length $self->{script_url}) {
         $request->{script_url} = $self->{script_url};
-
+    } elsif ($ENV{SCRIPT_URI}) {
+        ($request->{script_url}) = split (/\?/, $ENV{SCRIPT_URI});
     } else {
-        my ($script_url) = split (/\?/, $ENV{SCRIPT_URI});
-        die "Can't get script url"  unless length($script_url);
-        $request->{script_url} = $script_url;
+        $request->{script_url} = '/' . join('/', splitdir(abs2rel($0)));
     }
 
     $request->{script_url} = $self->terminate_url($request->{script_url});
@@ -162,15 +210,8 @@ sub read_urls {
 
     if (length $self->{base_url}) {
         $request->{base_url} = $self->{base_url};
-
     } else {
-        my $base_url = $request->{script_url};
-
-        my @base_path = split(m{/}, $base_url);
-        pop @base_path;
-        
-        $base_url = join("/", @base_path);
-        $request->{base_url} = $base_url;
+        $request->{base_url} = $self->base_url($request->{script_url});
     }
 
     $request->{base_url} = $self->terminate_url($request->{base_url});
@@ -277,23 +318,6 @@ sub response {
 }
 
 #----------------------------------------------------------------------
-# Run the cgi script, print the result
-
-sub run {
-    my ($self, %args) = @_;
-
-    my $request = $self->request(%args);
-    my $result = $self->response($request);
-
-    if (! %args) {
-        print "Content-type: $self->{protocol}\n\n";
-        print $result;
-    }
-
-    return $result;
-}
-
-#----------------------------------------------------------------------
 # Substitute for data for macro in template
 
 sub substitute {
@@ -318,10 +342,14 @@ sub substitute {
 sub terminate_url {
     my ($self, $url) = @_;
 
-    my ($file) = $url =~ m!([^/]*)$!;
-    $url .= '/' if defined($file) && length($file) && $file !~ /\./;
+    my $parsed_url = $self->parse_url($url);
 
-    return $url;
+    my $new_url = '';
+    $new_url = "$parsed_url->{method}//$parsed_url->{domain}"
+               if $parsed_url->{domain};
+   
+    $new_url .= "$parsed_url->{path}/$parsed_url->{file}";
+    return $new_url;
 }
 
 #----------------------------------------------------------------------
