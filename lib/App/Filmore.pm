@@ -21,8 +21,8 @@ App::Filmore - Server side support for CGI scripting
 =head1 DESCRIPTION
 
 App::Filmore is a collection of modules used to support cgi scripting on
-a web server. So far only the lowest level modules, which support reading
-object parameters from a configuration file, are done.
+a web server. It will be bundled with several example script, the first of
+which is search.cgi.
 
 =head1 LICENSE
 
