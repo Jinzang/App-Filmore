@@ -185,9 +185,6 @@ sub info_data {
     my $info = [{name => 'query',
                 title => 'Search',
                 valid=>"&string"},
-                {name => 'start',
-                 type => 'hidden',
-                 valid => 'int[1,]',},
                ];
 
     return $info;
