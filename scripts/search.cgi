@@ -15,7 +15,6 @@ my $search = App::Filmore::CgiHandler->new(config_file => $config_file,
                                            code_ptr => 'App::Filmore::SearchEngine',
                                           );
 
-chdir($Bin); 
 my %args = (query => join(' ', @ARGV));
 my $result = $search->run(%args);
 print $result;
