@@ -60,6 +60,7 @@ my $configuration_result = {
 is_deeply($configuration, $configuration_result, "Read file"); #test 1
 
 $cf->write_file($configuration_result);
-$cf->read_file($configuration);
 
+$configuration = {};
+$cf->read_file($configuration);
 is_deeply($configuration, $configuration_result, "Write file"); # test 2

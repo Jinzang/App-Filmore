@@ -67,7 +67,15 @@ sub read_file {
         die "Bad line in config file: ($name)" unless defined $value;
 
         $value =~ s/\s+$//;
-        $configuration->{$name} = $value;
+        if (! exists $configuration->{$name}) {
+            $configuration->{$name} = $value;
+
+        } elsif (ref $configuration->{$name} eq 'ARRAY') {
+            push(@{$configuration->{$name}}, $value);
+
+        } else {
+            $configuration->{$name} = [$configuration->{$name}, $value];
+        }
     }
 
     close($fd);
