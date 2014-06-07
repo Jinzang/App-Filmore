@@ -30,6 +30,7 @@ sub parameters {
         context_length => 80,
         body_tag => 'content',
         template_ptr => 'App::Filmore::SimpleTemplate',
+        webfile_ptr => 'App::Filmore::WebFile',
 	);
 
     return %parameters;
@@ -63,7 +64,7 @@ sub do_search {
         return if $do_pattern && ! /$do_pattern/o;
         return if $dont_pattern && /$dont_pattern/o;
     
-        my $text = $self->slurp($_);
+        my $text = $self->{webfile_ptr}->reader($_);
         return unless $text;
         
         my ($title, $body) =  $self->parse_htmldoc($text);
@@ -258,28 +259,6 @@ sub restrict_page {
     $response->{results} = \@restricted;
     
     return $response;
-}
-
-#----------------------------------------------------------------------
-# Read a file into a string
-
-sub slurp {
-    my ($self, $input) = @_;
-
-    my $in;
-    local $/;
-
-    if (ref $input) {
-        $in = $input;
-    } else {
-        $in = IO::File->new ($input);
-        return '' unless defined $in;
-    }
-
-    my $text = <$in>;
-    $in->close;
-
-    return $text;
 }
 
 #----------------------------------------------------------------------

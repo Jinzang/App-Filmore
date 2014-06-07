@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 use strict;
 
-use Test::More tests => 12;
+use Test::More tests => 9;
 
 use IO::File;
 use File::Path qw(rmtree);
@@ -24,10 +24,12 @@ my $test_dir = catdir(@path, 'test');
 rmtree($test_dir);
 mkdir $test_dir;
 chdir($test_dir);
-my $se = App::Filmore::SearchEngine->new();
+
+my %params = (valid_write => [$test_dir]);
+my $se = App::Filmore::SearchEngine->new(%params);
 
 #----------------------------------------------------------------------
-# Create test data and test slurp
+# Create test data
 
 do {
     my $template = <<'EOQ';
@@ -54,9 +56,6 @@ EOQ
         my $out = IO::File->new($file, 'w');
         print $out $text;
         close $out;
-        
-        my $result = $se->slurp($file);
-        is($result, $text, "test slurp on $file") # test 1-3
     }
 };
 
@@ -66,7 +65,7 @@ EOQ
 do {
     my $pattern = ['*.html', '*.pdf'];
     my $result = $se->globbify($pattern);
-    is($result, '(^.*\.html$)|(^.*\.pdf$)', 'globbify'); # test 4
+    is($result, '(^.*\.html$)|(^.*\.pdf$)', 'globbify'); # test 1
 };
 
 #----------------------------------------------------------------------
@@ -77,7 +76,7 @@ do {
     my $filename = rel2abs('one.html');
     
     my $result = $se->build_url($base_url, $test_dir, $filename);
-    is($result, "$base_url/one.html", 'build_url'); # test 5
+    is($result, "$base_url/one.html", 'build_url'); # test 2
 };
 
 #----------------------------------------------------------------------
@@ -94,7 +93,7 @@ do {
     $result_ok =~ s/ /+/g;
     $result_ok =~ s/\"/%22/g;
     
-    is($result, $result_ok, 'encode_url'); # test 6
+    is($result, $result_ok, 'encode_url'); # test 3
 };
 
 #----------------------------------------------------------------------
@@ -112,7 +111,7 @@ do {
     $result_ok =~ s/\s+$//;
     
     my $result = $se->get_context($text, 'dd', 80);
-    is($result, $result_ok, 'get_context');  #test 7  
+    is($result, $result_ok, 'get_context');  #test 4  
 };
 
 #----------------------------------------------------------------------
@@ -149,8 +148,8 @@ EOQ
 EOQ
 
     my ($title, $body) = $se->parse_htmldoc($text);
-    is($title, 'My Title', 'parse_htmldoc title'); # test 8
-    is($body, "\nMy content.\n", 'parse_htmldoc body'); # test 9
+    is($title, 'My Title', 'parse_htmldoc title'); # test 5
+    is($body, "\nMy content.\n", 'parse_htmldoc body'); # test 6
 };
 
 #----------------------------------------------------------------------
@@ -166,7 +165,7 @@ do {
                       context => 'This is the <b>first</b> page. It is not the fourth page.',
                       url => "$base_url/first.html"}];
 
-    is_deeply($result, $result_ok, 'do_search'); # test 10  
+    is_deeply($result, $result_ok, 'do_search'); # test 7  
 };
 
 #----------------------------------------------------------------------
@@ -189,9 +188,9 @@ do {
     my %restricted_ok = (%$hash, total => 100, start => 1, finish => 20);
     $restricted_ok{results} = \@subset;
 
-    is_deeply($restricted, \%restricted_ok, 'restrict_page'); # test 11
+    is_deeply($restricted, \%restricted_ok, 'restrict_page'); # test 8
 
     $restricted = $se->navlinks($restricted);
     is($restricted->{next_url}, "$url?query=$query&start=21",
-       'navlinks next'); # test 12
+       'navlinks next'); # test 9
 };

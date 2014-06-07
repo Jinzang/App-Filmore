@@ -24,7 +24,9 @@ use constant COMMANDS => {
 sub parameters {
 	my ($pkg) = @_;
 
-	return ();
+	return (
+            webfile_ptr => 'App::Filmore::WebFile',
+            );
 }
 
 #----------------------------------------------------------------------
@@ -41,7 +43,7 @@ sub compile_code {
         if ($template =~ /\n/) {
             $text = $template;
         } else {
-            $text = $self->slurp($template);
+            $text = $self->{webfile_ptr}->reader($template);
         }
 
         $text = $self->substitute_sections($text, $section);
@@ -176,28 +178,6 @@ sub parse_sections {
 }
 
 #----------------------------------------------------------------------
-# Read a file into a string
-
-sub slurp {
-    my ($self, $input) = @_;
-
-    my $in;
-    local $/;
-
-    if (ref $input) {
-        $in = $input;
-    } else {
-        $in = IO::File->new ($input);
-        return '' unless defined $in;
-    }
-
-    my $text = <$in>;
-    $in->close;
-
-    return $text;
-}
-
-#----------------------------------------------------------------------
 # Substitue comment delimeted sections for same blacks in template
 
 sub substitute_sections {
@@ -318,7 +298,7 @@ This is the method used to combine templates
     my $text;
     my $section = {};
     while (my $template_name = pop(@template_names)) {
-        $text = $obj->slurp($template_name);
+        $text = $obj->{webfile_ptr}->reader($template_name);
         $text = $obj->substitute_sections($text, $section);
     }
 

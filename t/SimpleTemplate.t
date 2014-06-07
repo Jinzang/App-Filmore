@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 use strict;
 
-use Test::More tests => 10;
+use Test::More tests => 7;
 
 use IO::File;
 use File::Path qw(rmtree);
@@ -26,7 +26,7 @@ mkdir $test_dir;
 chdir($test_dir);
 
 #----------------------------------------------------------------------
-# Create test data and test slurp
+# Create test data
 
 do {
     my $template = <<'EOQ';
@@ -54,9 +54,6 @@ EOQ
         my $out = IO::File->new($file, 'w');
         print $out $text;
         close $out;
-        
-        my $result = $st->slurp($file);
-        is($result, $text, "test slurp on $file") # test 1-3
     }
 };
 
@@ -98,11 +95,11 @@ EOQ
     my $section_ok = {header => "\n<title>My Title</title>\n",
                       content => "\n<p>My content.</p>\n"};
     
-    is_deeply($section, $section_ok, 'parse_sections'); # test 4
+    is_deeply($section, $section_ok, 'parse_sections'); # test 1
     
     my $result = $st->substitute_sections($template, $section);
-    like($result, qr(charset), 'substitute_sections, template code'); # test 5
-    like($result, qr(My content), 'substitute_sections, section code'); # test 6
+    like($result, qr(charset), 'substitute_sections, template code'); # test 2
+    like($result, qr(My content), 'substitute_sections, section code'); # test 3
 };
 
 #----------------------------------------------------------------------
@@ -128,7 +125,7 @@ Ann 4444
 Joe 5555
 EOQ
     
-    is($text, $text_ok, "compile_code for loop"); # test 7
+    is($text, $text_ok, "compile_code for loop"); # test 4
 };
 
 #----------------------------------------------------------------------
@@ -150,13 +147,13 @@ EOQ
     
     my $data = {x => 1};
     my $text = $sub->($data);
-    is($text, "\$x is 1 (one)\n", "compile_code if block"); # test 8
+    is($text, "\$x is 1 (one)\n", "compile_code if block"); # test 5
     
     $data = {x => 2};
     $text = $sub->($data);
-    is($text, "\$x is 2 (two)\n", "compile_code elsif block"); # test 9
+    is($text, "\$x is 2 (two)\n", "compile_code elsif block"); # test 6
     
     $data = {x => 3};
     $text = $sub->($data);
-    is($text, "\$x is unknown\n", "compile_code else block"); # test 10
+    is($text, "\$x is unknown\n", "compile_code else block"); # test 7
 };

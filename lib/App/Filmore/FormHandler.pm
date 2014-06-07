@@ -25,6 +25,7 @@ sub parameters {
         body_tag => 'content',
         web_extension => 'html',
         template_ptr => 'App::Filmore::SimpleTemplate',
+        webfile_ptr => 'App::Filmore::WebFile',
         code_ptr => '',
     );
 }
@@ -231,7 +232,7 @@ sub populate_items {
     my ($self, $response) = @_;
 
     my $filename = $self->url_to_filename($response->{url});
-    my $text = $self->slurp($filename);
+    my $text = $self->{webfile_ptr}->reader($filename);
 
     my $section = $self->{template_ptr}->parse_sections($text);
 
