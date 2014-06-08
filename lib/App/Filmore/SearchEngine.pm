@@ -13,7 +13,6 @@ use base qw(App::Filmore::ConfiguredObject);
 our $VERSION = '0.01';
 
 use IO::File;
-use File::Find;
 use Text::ParseWords;
 use File::Spec::Functions qw(abs2rel catfile rel2abs splitdir);
 
@@ -60,45 +59,48 @@ sub do_search {
     my $do_pattern = $self->globbify($self->{do_search});
     my $dont_pattern = $self->globbify($self->{dont_search});
 
-    my $searcher = sub {
-        return if $do_pattern && ! /$do_pattern/o;
-        return if $dont_pattern && /$dont_pattern/o;
-    
-        my $text = $self->{webfile_ptr}->reader($_);
-        return unless $text;
+    if (@term) {
+        my $visit = $self->{webfile_ptr}->visitor($base_directory, '-date');
+        while (defined (my $filename = &$visit)) {
+            my ($dir, $basename) =
+                $self->{webfile_ptr}->split_filename($filename);
+
+            next if $do_pattern && ! $basename =~ /$do_pattern/o;
+            next if $dont_pattern && $basename =~ /dont_pattern/o;
         
-        my ($title, $body) =  $self->parse_htmldoc($text);
-        return unless length ($body);
-    
-        my ($count, @pos);
-        foreach my $term (@term) {
-            my $pos = 0;
-            while ($body =~ /$term/gi) {
-                $pos ||= pos ($body);
-                $count ++;
+            my $text = $self->{webfile_ptr}->reader($filename);
+            next unless $text;
+            
+            my ($title, $body) =  $self->parse_htmldoc($text);
+            next unless length ($body);
+        
+            my ($count, @pos);
+            foreach my $term (@term) {
+                my $pos = 0;
+                while ($body =~ /$term/gi) {
+                    $pos ||= pos ($body);
+                    $count ++;
+                }
+        
+                if ($pos) {
+                    push (@pos, $pos);
+                }
             }
-    
-            if ($pos) {
-                push (@pos, $pos);
-            } else {
-                return;
-            }
+        
+            next unless $count;
+            
+            my $modtime = (stat $filename)[9];
+            my $result = {title => $title, count => $count, modtime => $modtime};
+        
+            $result->{url} = 
+              $self->build_url($base_url, $base_directory, $filename);
+        
+            $result->{context} = $self->get_context($body, $term[0], $pos[0]),;
+        
+            push (@$results, $result);
         }
-    
-        my $modtime = (stat $_)[9];
-        my $result = {title => $title, count => $count, modtime => $modtime};
-    
-        $result->{url} = 
-          $self->build_url($base_url, $base_directory, $File::Find::name);
-    
-        $result->{context} = $self->get_context($body, $term[0], $pos[0]),;
-    
-        push (@$results, $result);
     };
 
-    # Search the directory tree
-
-    find ($searcher, $base_directory) if @term;
     return $results;
 }
 
