@@ -74,7 +74,7 @@ eval {
 is($@, "Invalid filename: $filename\n",
    "validate_filename outside dir"); # test 7
 
-$filename = 'Forbidden.html';
+$filename = '../forbidden.html';
 eval {
     $filename = $wf->validate_filename($filename, 'r');
 };
@@ -161,13 +161,13 @@ $wf->writer($templatename, $template);
 
 my $src = $wf->reader($pagename);
 
-is($src, $page, "Read/Write"); #test 15
+is($src, $page, "Read/Write"); #test 11
 
 my $nestedname = catfile('data', 'dir002', 'dir001', 'dir001', 'page001.html');
 $wf->writer($nestedname, $page);
 
 $src = $wf->reader($nestedname);
-is($src, $page, "Write nested directories"); # test 11
+is($src, $page, "Write nested directories"); # test 12
 
 #----------------------------------------------------------------------
 # Test file visitor
@@ -184,4 +184,4 @@ my $visit_result = [
                             'dir001', 'page001.html'),
                     catfile($data_dir, 'script', 'page.htm'),
                     ];
-is_deeply($files, $visit_result, "File visitor"); # test 12
+is_deeply($files, $visit_result, "File visitor"); # test 13

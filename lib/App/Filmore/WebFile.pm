@@ -250,17 +250,9 @@ sub under_any_dir {
         $valid_dirs = $self->{valid_write};
     }
 
-    if (@$valid_dirs) {
-        my $valid_name = VALID_NAME;
-        my $path = rel2abs($filename);
-
-        foreach my $dir (@$valid_dirs) {
-			my $path = abs2rel($path, $dir);
-            return 1 if $path eq '.';
-            
-			my @path = splitdir($path);
-			return 1 unless grep {! /$valid_name/} @path;
-        }
+    my $path = rel2abs($filename);
+    foreach my $dir (@$valid_dirs) {
+        return 1 unless grep {/\.\./} splitdir($path)
     }
 
     return;
