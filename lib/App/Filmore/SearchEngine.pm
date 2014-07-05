@@ -12,6 +12,7 @@ use base qw(App::Filmore::ConfiguredObject);
 
 our $VERSION = '0.01';
 
+use Cwd;
 use IO::File;
 use Text::ParseWords;
 use File::Spec::Functions qw(abs2rel catfile rel2abs splitdir);
@@ -288,7 +289,7 @@ $field
 <!-- endfor -->
 </form>
 </div>
-<!-- if $query -->
+<!-- if $cmd -->
 <!-- if $total -->
 <p>Documents $start to $finish of $total</p>
 <!-- else -->
@@ -326,7 +327,7 @@ sub write_data {
 
     # Set configuration variables if left empty
     
-    my $base_directory = $response->{base_directory} || cwd();
+    my $base_directory = $response->{base_directory} || getcwd();
     my $base_url = $response->{base_url} || '';
     $base_url =~ s!/[^/]*$!!;
     
