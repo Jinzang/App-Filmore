@@ -21,7 +21,7 @@ my $search = App::Filmore::CgiHandler->new(config_file => $config_file,
                                            valid_write => [$base_dir], 
                                           );
 
-my %args = (query => join(' ', @ARGV));
+my %args = (query => join(' ', @ARGV), cmd => 'Edit');
 my $result = $search->run(%args);
 print $result;
 
