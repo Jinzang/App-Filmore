@@ -46,10 +46,9 @@ sub parameters {
   my ($pkg) = @_;
 
     return (
-            base_dir => '',
+            base_directory => '',
             base_url => '',
             script_url => '',
-            script_dir => '',
             detail_errors => 1,
             protocol => 'text/html',
             form_ptr => 'App::Filmore::FormHandler',
@@ -287,8 +286,8 @@ sub response {
     eval {
         # Relocate to base directory, if defined
 
-        if (length $self->{base_dir}) {
-            my $dir = $self->untaint_filename($self->{base_dir});
+        if (length $self->{base_directory}) {
+            my $dir = $self->untaint_filename($self->{base_directory});
             chdir($dir) or die "Couldn't move to $dir: $!\n";
         }
 
