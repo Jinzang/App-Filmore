@@ -8,6 +8,7 @@ use base qw(App::Filmore::ConfiguredObject);
 
 our $VERSION = '0.01';
 
+use Cwd;
 use File::Spec::Functions qw(abs2rel catfile rel2abs splitdir);
 
 use constant DEFAULT_MAIL_TEMPLATE => <<'EOQ';
@@ -191,13 +192,14 @@ sub template_filename {
 sub url_to_filename {
     my ($self, $response) = @_;
 
-    my $base_url = $self->{base_url};
+    my $base_url = $response->{base_url};
+    my $base_directory = $self->{base_directory} || getcwd();
     my $web_extension = $self->{web_extension};
     
     my ($file) = $response->{url} =~ /^$base_url([\w\-\/]+\.$web_extension)$/;
     return '' unless $file;
 
-    $file = rel2abs($file, $self->{base_directory});
+    $file = rel2abs($file, $base_directory);
     return $file;
 }
 
