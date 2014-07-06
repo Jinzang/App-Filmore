@@ -180,6 +180,7 @@ do {
     my $body_tag = $fm->{body_tag};
     my $body = "\n<p>Sein oder nicht sein.</p>\n";
     my $response = {url => $base_url . 'index.html', body => $body};
+
     my $text = $fm->build_web_page($response);
 
     my $section = $fm->{template_ptr}->parse_sections($text);

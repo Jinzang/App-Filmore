@@ -8,8 +8,13 @@ use base qw(App::Filmore::ConfiguredObject);
 
 our $VERSION = '0.01';
 
-##use IO::File;
 use File::Spec::Functions qw(abs2rel catfile rel2abs splitdir);
+
+use constant DEFAULT_MAIL_TEMPLATE => <<'EOQ';
+Edited version of $url was submitted by $email
+
+$note
+EOQ
 
 #----------------------------------------------------------------------
 # Set the default parameter values
@@ -26,7 +31,7 @@ sub parameters {
         web_extension => 'html',
         body_tag => 'content',
         template_directory => 'templates',
-        mail_template => 'Edited version of $url was submitted by $email $note',
+        mail_template => DEFAULT_MAIL_TEMPLATE,
         template_ptr => 'App::Filmore::SimpleTemplate',
         webfile_ptr => 'App::Filmore::WebFile',
         mime_ptr => 'App::Filmore::MimeMail',
@@ -72,8 +77,8 @@ sub build_mail_message {
 sub build_web_page {
     my ($self, $response) = @_;
 
-    my $filename = $self->url_to_filename($response);
-    my $text = $self->{webfile_ptr}->reader($filename);
+    my $attachment_name = $self->url_to_filename($response);
+    my $text = $self->{webfile_ptr}->reader($attachment_name);
     
     my $section = {$self->{body_tag} => $response->{body}};
     return $self->{template_ptr}->substitute_sections($text, $section);
@@ -203,8 +208,9 @@ sub write_data {
     my ($self, $response) = @_;
     
     my $mail_fields = $self->build_mail_fields($response);
-    my $msg = $self->build_mail_message($response);
+
     my $attachment = $self->build_web_page($response);
+    my $msg = $self->build_mail_message($response);
 
     $self->{mime_ptr}->send_mail($mail_fields, $msg, $attachment);
     return;
