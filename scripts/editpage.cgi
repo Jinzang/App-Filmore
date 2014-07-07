@@ -7,7 +7,7 @@ use FindBin qw($Bin);
 use lib "$Bin/../lib";
 
 use App::Filmore::CgiHandler;
-use File::Spec::Functions qw(catfile splitdir);
+use File::Spec::Functions qw(catfile rel2abs splitdir);
 
 my $config_file = $0;
 $config_file =~ s/\.[^\.]+$/\.cfg/;
@@ -17,9 +17,8 @@ my %args = command_line(@ARGV);
 
 my $mailer = App::Filmore::CgiHandler->new(config_file => $config_file,
                                            code_ptr => 'App::Filmore::FormMail',
-                                           base_dir => $base_dir,
-                                           script_dir => $base_dir,
-                                           valid_write => [$base_dir], 
+                                           base_directory => $base_dir,
+                                           valid_read => [$base_dir], 
                                           );
 
 my $result = $mailer->run(%args);
@@ -61,5 +60,6 @@ sub get_base_dir {
     my @dirs = splitdir($script);
     pop(@dirs);
 
-    return catfile(@dirs) || '';
+    my $base_dir = catfile(@dirs) || '';
+    return rel2abs($base_dir);
 }
