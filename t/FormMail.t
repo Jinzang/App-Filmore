@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 use strict;
 
-use Test::More tests => 7;
+use Test::More tests => 6;
 
 use IO::File;
 use File::Path qw(rmtree);
@@ -30,8 +30,6 @@ my $base_url = 'http://www.example.com/';
 
 my %params = (
               valid_read => [$test_dir],
-              base_directory => $test_dir,
-              base_url => $base_url,
               web_master => 'busy@body.com',
               );
 
@@ -135,18 +133,6 @@ do {
 };
 
 #----------------------------------------------------------------------
-# Build filename from url
-
-do {
-    my $file = 'foobar.html';
-    my $url = $base_url . $file;
-    my $filename_ok = catfile($test_dir, $file);
-    
-    my $filename = $fm->url_to_filename({url => $url});
-    is($filename, $filename_ok, 'Url to filename'); # test 3
-};
-
-#----------------------------------------------------------------------
 # Read contents of a web page
 
 do {
@@ -157,20 +143,20 @@ do {
   
 EOQ
     chomp $body_ok;
-    my $response = {url => $base_url . 'index.html'};
+    my $response = {base_url => $base_url, url => $base_url . 'index.html'};
     $fm->read_data($response);
     
-    is($response->{body}, $body_ok, 'Read page contents'); # test 4
+    is($response->{body}, $body_ok, 'Read page contents'); # test 3
 };
 
 #----------------------------------------------------------------------
 # Read template
 
 do {
-    my $response = {url => $base_url . 'index.html'};
+    my $response = {base_url => $base_url, url => $base_url . 'index.html'};
     my $text = $fm->template_data($response);
     
-    is($text, $form, 'Read template'); # test 5
+    is($text, $form, 'Read template'); # test 4
 };
 
 #----------------------------------------------------------------------
@@ -179,12 +165,14 @@ do {
 do {
     my $body_tag = $fm->{body_tag};
     my $body = "\n<p>Sein oder nicht sein.</p>\n";
-    my $response = {url => $base_url . 'index.html', body => $body};
+    my $response = {base_url => $base_url,
+                    url => $base_url . 'index.html',
+                    body => $body};
 
     my $text = $fm->build_web_page($response);
 
     my $section = $fm->{template_ptr}->parse_sections($text);
-    is($section->{$body_tag}, $body, 'Build web page'); # test 6
+    is($section->{$body_tag}, $body, 'Build web page'); # test 5
 };
 
 #----------------------------------------------------------------------
@@ -204,6 +192,6 @@ do {
                    };
     
     my $mail = $fm->build_mail_fields($response);
-    is_deeply($mail, $mail_ok, 'Build mail fields'); # test 7
+    is_deeply($mail, $mail_ok, 'Build mail fields'); # test 6
 };
 

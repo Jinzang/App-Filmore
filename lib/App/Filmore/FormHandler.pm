@@ -23,7 +23,6 @@ sub parameters {
     return (
         site_template => '',
         body_tag => 'content',
-        web_extension => 'html',
         template_ptr => 'App::Filmore::SimpleTemplate',
         webfile_ptr => 'App::Filmore::WebFile',
         code_ptr => '',
@@ -231,7 +230,7 @@ sub parse_validator {
 sub populate_items {
     my ($self, $response) = @_;
 
-    my $filename = $self->url_to_filename($response->{url});
+    my $filename = $self->{webfile_ptr}->url_to_filename($response);
     my $text = $self->{webfile_ptr}->reader($filename);
 
     my $section = $self->{template_ptr}->parse_sections($text);
@@ -308,22 +307,6 @@ sub update_response_items {
     }
    
     return;
-}
-
-#----------------------------------------------------------------------
-# Convert url to filename, return undef if can't
-
-sub url_to_filename {
-    my ($self, $url) = @_;
-
-    my $base_url = $self->{base_url};
-    my $web_extension = $self->{web_extension};
-    
-    my ($file) = $url =~ /^$base_url([\w\-\/]+\.$web_extension)$/;
-    return unless $file;
-
-    $file = rel2abs($file, $self->{base_directory});
-    return $file;
 }
 
 #----------------------------------------------------------------------
@@ -471,12 +454,12 @@ sub valid_string_selection {
 }
 
 #----------------------------------------------------------------------
-# Validate an email address
+# Validate a url
 
 sub valid_url {
     my ($self, $value) = @_;
     
-    my $filename = $self->url_to_filename($value);
+    my $filename = $self->{webfile_ptr}->url_to_filename($value);
     return defined $filename && -e $filename;
 }
 

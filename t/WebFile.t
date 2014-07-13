@@ -3,7 +3,7 @@ use strict;
 
 use lib 't';
 use lib 'lib';
-use Test::More tests => 13;
+use Test::More tests => 14;
 
 use IO::File;
 use Cwd qw(abs_path getcwd);
@@ -36,7 +36,11 @@ mkdir($script_dir);
 
 BEGIN {use_ok("App::Filmore::WebFile");} # test 1
 
+my $base_url = 'http://www.example.com/';
+
 my $params = {
+              base_directory => $data_dir,
+              base_url => $base_url,
               data_dir => $data_dir,
               valid_write => [$data_dir, $script_dir,],
              };
@@ -89,6 +93,19 @@ $filename = catfile($data_dir, 'index.html');
 ($dir, $filename) = $wf->split_filename($filename);
 is($dir, $data_dir, "Split filename: dir"); # test 9
 is($filename, 'index.html', "Split filename: basename"); # test 10
+
+#----------------------------------------------------------------------
+# Build filename from url
+
+do {
+    my $file = 'foobar.html';
+    my $url = $base_url . $file;
+    my $filename_ok = catfile($data_dir, $file);
+    
+    my $response = {base_url => $base_url, url => $url};
+    my $filename = $wf->url_to_filename($response);
+    is($filename, $filename_ok, 'Url to filename'); # test 11
+};
 
 #----------------------------------------------------------------------
 # Create test files
@@ -161,13 +178,13 @@ $wf->writer($templatename, $template);
 
 my $src = $wf->reader($pagename);
 
-is($src, $page, "Read/Write"); #test 11
+is($src, $page, "Read/Write"); #test 12
 
 my $nestedname = catfile('data', 'dir002', 'dir001', 'dir001', 'page001.html');
 $wf->writer($nestedname, $page);
 
 $src = $wf->reader($nestedname);
-is($src, $page, "Write nested directories"); # test 12
+is($src, $page, "Write nested directories"); # test 13
 
 #----------------------------------------------------------------------
 # Test file visitor
@@ -184,4 +201,4 @@ my $visit_result = [
                             'dir001', 'page001.html'),
                     catfile($data_dir, 'script', 'page.htm'),
                     ];
-is_deeply($files, $visit_result, "File visitor"); # test 13
+is_deeply($files, $visit_result, "File visitor"); # test 14

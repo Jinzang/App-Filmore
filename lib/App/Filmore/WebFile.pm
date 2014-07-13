@@ -28,11 +28,12 @@ sub parameters {
     my %parameters = (
                     nonce => 0,
                     group => '',
-                    data_dir => '',
+                    base_directory => '',
                     valid_read => [],
                     valid_write => [],
 					index_name => 'index',
 					permissions => 0664,
+                    web_extension => 'html',
 	);
 
     return %parameters;
@@ -57,7 +58,7 @@ sub copy_file {
 sub create_dirs {
     my ($self, @dirs) = @_;
 
-    my $path = $self->validate_filename($self->{data_dir}, 'r');
+    my $path = $self->validate_filename($self->{base_directory}, 'r');
 	
     foreach my $dir (@dirs) {
         next if $dir eq '.';
@@ -271,6 +272,23 @@ sub untaint_filename {
     die "Tainted filename: $filename\n" if $self->taint_check($newname);
 
     return $newname;
+}
+
+#----------------------------------------------------------------------
+# Convert url to filename, return undef if can't
+
+sub url_to_filename {
+    my ($self, $response) = @_;
+
+    my $base_url = $response->{base_url};
+    my $base_directory = $self->{base_directory} || getcwd();
+    my $web_extension = $self->{web_extension};
+    
+    my ($file) = $response->{url} =~ /^$base_url([\w\-\/]+\.$web_extension)$/;
+    return '' unless $file;
+
+    $file = rel2abs($file, $base_directory);
+    return $file;
 }
 
 #----------------------------------------------------------------------

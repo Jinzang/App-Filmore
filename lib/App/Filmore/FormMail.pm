@@ -24,12 +24,9 @@ sub parameters {
     my ($pkg) = @_;
     
     return (
-        base_directory => '',
-        base_url => '',
         web_master => '',
         info_extension => 'info',
         template_extension => 'htm',
-        web_extension => 'html',
         body_tag => 'content',
         template_directory => 'templates',
         mail_template => DEFAULT_MAIL_TEMPLATE,
@@ -78,7 +75,7 @@ sub build_mail_message {
 sub build_web_page {
     my ($self, $response) = @_;
 
-    my $attachment_name = $self->url_to_filename($response);
+    my $attachment_name = $self->{webfile_ptr}->url_to_filename($response);
     my $text = $self->{webfile_ptr}->reader($attachment_name);
     
     my $section = {$self->{body_tag} => $response->{body}};
@@ -148,7 +145,7 @@ sub info_data {
 sub read_data {
     my ($self, $response) = @_;
 
-    my $filename = $self->url_to_filename($response);
+    my $filename = $self->{webfile_ptr}->url_to_filename($response);
     my $text = $self->{webfile_ptr}->reader($filename);
     die "Couldn't read filename: $filename" unless $text;
     
@@ -184,23 +181,6 @@ sub template_filename {
                                 "$script_base.$ext");
         
     return rel2abs($template_name);
-}
-
-#----------------------------------------------------------------------
-# Convert url to filename, return undef if can't
-
-sub url_to_filename {
-    my ($self, $response) = @_;
-
-    my $base_url = $response->{base_url};
-    my $base_directory = $self->{base_directory} || getcwd();
-    my $web_extension = $self->{web_extension};
-    
-    my ($file) = $response->{url} =~ /^$base_url([\w\-\/]+\.$web_extension)$/;
-    return '' unless $file;
-
-    $file = rel2abs($file, $base_directory);
-    return $file;
 }
 
 #----------------------------------------------------------------------
