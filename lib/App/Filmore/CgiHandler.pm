@@ -52,6 +52,7 @@ sub parameters {
             detail_errors => 1,
             protocol => 'text/html',
             form_ptr => 'App::Filmore::FormHandler',
+            webfile_ptr => 'App::Filmore::WebFile',
 	);
 }
 
@@ -136,39 +137,6 @@ sub error {
 
     my $result = $self->render($template, $data);
     return $result;
-}
-
-#----------------------------------------------------------------------
-# Parse a url into its components
-
-sub parse_url {
-    my ($self, $url) = @_;
-
-    my %parsed_url = (method => 'http:', domain => '', path => '', file => '');    
-    my ($method, $rest) = split(m!//!, $url, 2);
-
-    unless (defined $rest) {
-        $rest = $method;
-    } else {
-        $parsed_url{method} = $method;
-    }
-    
-
-    if ($rest) {
-        my @path = split(m!/!, $rest);
-
-        if (@path) { 
-            if ($path[0] =~ /\.(com|org|edu|us)$/) {
-                $parsed_url{domain} = $path[0];
-                $path[0] = '';
-            }
-            
-            $parsed_url{file} = pop(@path) if $path[-1] =~ /\./;
-            $parsed_url{path} = join('/', @path);
-        }
-    }
-    
-    return \%parsed_url;
 }
 
 #----------------------------------------------------------------------
@@ -287,7 +255,8 @@ sub response {
         # Relocate to base directory, if defined
 
         if (length $self->{base_directory}) {
-            my $dir = $self->untaint_filename($self->{base_directory});
+            my $dir =
+                $self->{webfile_ptr}->untaint_filename($self->{base_directory});
             chdir($dir) or die "Couldn't move to $dir: $!\n";
         }
 
@@ -341,7 +310,7 @@ sub substitute {
 sub terminate_url {
     my ($self, $url) = @_;
 
-    my $parsed_url = $self->parse_url($url);
+    my $parsed_url = $self->{webfile_ptr}->parse_url($url);
 
     my $new_url = '';
     $new_url = "$parsed_url->{method}//$parsed_url->{domain}"
@@ -349,18 +318,6 @@ sub terminate_url {
    
     $new_url .= "$parsed_url->{path}/$parsed_url->{file}";
     return $new_url;
-}
-
-#----------------------------------------------------------------------
-# Make sure filename passes taint check
-
-sub untaint_filename {
-    my ($self, $filename) = @_;
-
-    $filename = rel2abs($filename);
-    ($filename) = $filename =~ m{^([\w\-\.\/\\]+)$};
-
-    return $filename;
 }
 
 1;

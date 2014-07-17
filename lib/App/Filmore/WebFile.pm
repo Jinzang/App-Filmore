@@ -103,6 +103,38 @@ sub get_nonce {
     return md5_hex($(, $nonce, $>);
 }
 
+#----------------------------------------------------------------------
+# Parse a url into its components
+
+sub parse_url {
+    my ($self, $url) = @_;
+
+    my %parsed_url = (method => 'http:', domain => '', path => '', file => '');    
+    my ($method, $rest) = split(m!//!, $url, 2);
+
+    unless (defined $rest) {
+        $rest = $method;
+    } else {
+        $parsed_url{method} = $method;
+    }
+    
+
+    if ($rest) {
+        my @path = split(m!/!, $rest);
+
+        if (@path) { 
+            if ($path[0] =~ /\.(com|org|edu|us)$/) {
+                $parsed_url{domain} = $path[0];
+                $path[0] = '';
+            }
+            
+            $parsed_url{file} = pop(@path) if $path[-1] =~ /\./;
+            $parsed_url{path} = join('/', @path);
+        }
+    }
+    
+    return \%parsed_url;
+}
 
 #----------------------------------------------------------------------
 # Read contents of file
@@ -278,16 +310,18 @@ sub untaint_filename {
 # Convert url to filename, return undef if can't
 
 sub url_to_filename {
-    my ($self, $response) = @_;
+    my ($self, $url) = @_;
 
-    my $base_url = $response->{base_url};
-    my $base_directory = $self->{base_directory} || getcwd();
-    my $web_extension = $self->{web_extension};
+    my $parsed_url = $self->parse_url($url);
+    $parsed_url->{file} ||= $self->{index_name} . $self->{web_extension};
+
+    my @path = split(/\//, $parsed_url->{path});
+    push(@path, $parsed_url->{file});
+    my $file = catfile(@path);
     
-    my ($file) = $response->{url} =~ /^$base_url([\w\-\/]+\.$web_extension)$/;
-    return '' unless $file;
-
+    my $base_directory = $self->{base_directory} || getcwd();
     $file = rel2abs($file, $base_directory);
+
     return $file;
 }
 

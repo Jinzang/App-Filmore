@@ -3,7 +3,7 @@ use strict;
 
 use lib 't';
 use lib 'lib';
-use Test::More tests => 14;
+use Test::More tests => 16;
 
 use IO::File;
 use Cwd qw(abs_path getcwd);
@@ -89,10 +89,28 @@ is($@, "Invalid filename: $filename\n",
 #----------------------------------------------------------------------
 # Filename maniputlations
 
-$filename = catfile($data_dir, 'index.html');
-($dir, $filename) = $wf->split_filename($filename);
-is($dir, $data_dir, "Split filename: dir"); # test 9
-is($filename, 'index.html', "Split filename: basename"); # test 10
+do {
+    $filename = catfile($data_dir, 'index.html');
+    ($dir, $filename) = $wf->split_filename($filename);
+    is($dir, $data_dir, "Split filename: dir"); # test 9
+    is($filename, 'index.html', "Split filename: basename"); # test 10
+};
+
+#----------------------------------------------------------------------
+# Parse url
+
+do {
+    my $parsed_url = $wf->parse_url('http://www.test.org/script/test.cgi');
+    my $parsed_url_ok = {method => 'http:', domain => 'www.test.org',
+                         path => '/script', file => 'test.cgi'};
+
+    is_deeply($parsed_url, $parsed_url_ok, 'Parse complete url'); # test 11
+    
+    $parsed_url = $wf->parse_url('/script/test.cgi');
+    $parsed_url_ok->{domain} = '';
+    is_deeply($parsed_url, $parsed_url_ok, 'Parse partial url'); # test 12
+    
+};
 
 #----------------------------------------------------------------------
 # Build filename from url
@@ -102,9 +120,8 @@ do {
     my $url = $base_url . $file;
     my $filename_ok = catfile($data_dir, $file);
     
-    my $response = {base_url => $base_url, url => $url};
-    my $filename = $wf->url_to_filename($response);
-    is($filename, $filename_ok, 'Url to filename'); # test 11
+    my $filename = $wf->url_to_filename($url);
+    is($filename, $filename_ok, 'Url to filename'); # test 13
 };
 
 #----------------------------------------------------------------------
@@ -178,13 +195,13 @@ $wf->writer($templatename, $template);
 
 my $src = $wf->reader($pagename);
 
-is($src, $page, "Read/Write"); #test 12
+is($src, $page, "Read/Write"); #test 14
 
 my $nestedname = catfile('data', 'dir002', 'dir001', 'dir001', 'page001.html');
 $wf->writer($nestedname, $page);
 
 $src = $wf->reader($nestedname);
-is($src, $page, "Write nested directories"); # test 13
+is($src, $page, "Write nested directories"); # test 15
 
 #----------------------------------------------------------------------
 # Test file visitor
@@ -201,4 +218,4 @@ my $visit_result = [
                             'dir001', 'page001.html'),
                     catfile($data_dir, 'script', 'page.htm'),
                     ];
-is_deeply($files, $visit_result, "File visitor"); # test 14
+is_deeply($files, $visit_result, "File visitor"); # test 16

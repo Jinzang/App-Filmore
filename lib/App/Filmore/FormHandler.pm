@@ -230,7 +230,7 @@ sub parse_validator {
 sub populate_items {
     my ($self, $response) = @_;
 
-    my $filename = $self->{webfile_ptr}->url_to_filename($response);
+    my $filename = $self->{webfile_ptr}->url_to_filename($response->{url});
     my $text = $self->{webfile_ptr}->reader($filename);
 
     my $section = $self->{template_ptr}->parse_sections($text);

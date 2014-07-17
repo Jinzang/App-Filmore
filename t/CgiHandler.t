@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl
 use strict;
 
-use Test::More tests => 11;
+use Test::More tests => 9;
 
 use Cwd;
 use File::Path qw(rmtree);
@@ -55,32 +55,22 @@ can_ok($o, qw(run)); # test 2
 # Test url manipulation
 
 do {
-    my $parsed_url = $o->parse_url($params{script_url});
-    my $parsed_url_ok = {method => 'http:', domain => 'www.test.org',
-                         path => '/script', file => 'test.cgi'};
-
-    is_deeply($parsed_url, $parsed_url_ok, 'Parse complete url'); # test 3
-    
-    $parsed_url = $o->parse_url('/script/test.cgi');
-    $parsed_url_ok->{domain} = '';
-    is_deeply($parsed_url, $parsed_url_ok, 'Parse partial url'); # test 4
-
     my $url = "$base_url/index.html";
     my $result = $o->terminate_url($url);
-    is($result, $url, 'Terminate url with filename'); # test 5
+    is($result, $url, 'Terminate url with filename'); # test 3
     
     $result = $o->terminate_url($base_url);
-    is($result, "$params{base_url}/", 'Terminate url with no filename'); # test 6
+    is($result, "$params{base_url}/", 'Terminate url with no filename'); # test 4
 
     $url = '/';
     $result = $o->terminate_url($url);
-    is($result, $url, 'Terminate single slash url'); # test 7
+    is($result, $url, 'Terminate single slash url'); # test 5
     
     $result = $o->base_url($base_url);
-    is($result, "$base_url/", 'Compute base url from directory'); # test 8
+    is($result, "$base_url/", 'Compute base url from directory'); # test 6
 
     $result = $o->base_url($params{script_url});
-    is($result, "$base_url/script/", 'Compute base url from file'); # test 9
+    is($result, "$base_url/script/", 'Compute base url from file'); # test 7
 };
 
 #----------------------------------------------------------------------
@@ -94,7 +84,7 @@ do {
                       script_base_url => "$base_url/script/",
                       script_url => "$base_url/script/test.cgi",
                      };
-    is_deeply($request, $request_ok, "Read urls when initialized"); # test 10
+    is_deeply($request, $request_ok, "Read urls when initialized"); # test 8
 
     $o->{base_url} = '';
 
@@ -106,5 +96,5 @@ do {
                    script_base_url => '/t/',
                    script_url => '/t/CgiHandler.t',
                   };
-    is_deeply($request, $request_ok, "Read urls when uninitialized"); # test 11
+    is_deeply($request, $request_ok, "Read urls when uninitialized"); # test 9
 };

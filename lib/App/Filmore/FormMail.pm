@@ -75,7 +75,8 @@ sub build_mail_message {
 sub build_web_page {
     my ($self, $response) = @_;
 
-    my $attachment_name = $self->{webfile_ptr}->url_to_filename($response);
+    my $attachment_name =
+        $self->{webfile_ptr}->url_to_filename($response->{url});
     my $text = $self->{webfile_ptr}->reader($attachment_name);
     
     my $section = {$self->{body_tag} => $response->{body}};
@@ -145,7 +146,7 @@ sub info_data {
 sub read_data {
     my ($self, $response) = @_;
 
-    my $filename = $self->{webfile_ptr}->url_to_filename($response);
+    my $filename = $self->{webfile_ptr}->url_to_filename($response->{url});
     my $text = $self->{webfile_ptr}->reader($filename);
     die "Couldn't read filename: $filename" unless $text;
     
