@@ -141,6 +141,21 @@ sub info_data {
 }
 
 #----------------------------------------------------------------------
+# Send mail message when request is correct
+
+sub perform_data {
+    my ($self, $response) = @_;
+    
+    my $mail_fields = $self->build_mail_fields($response);
+
+    my $attachment = $self->build_web_page($response);
+    my $msg = $self->build_mail_message($response);
+
+    $self->{mime_ptr}->send_mail($mail_fields, $msg, $attachment);
+    return 1;
+}
+
+#----------------------------------------------------------------------
 # Read data from file into form
 
 sub read_data {
@@ -182,21 +197,6 @@ sub template_filename {
                                 "$script_base.$ext");
         
     return rel2abs($template_name);
-}
-
-#----------------------------------------------------------------------
-# Send mail message when request is correct
-
-sub write_data {
-    my ($self, $response) = @_;
-    
-    my $mail_fields = $self->build_mail_fields($response);
-
-    my $attachment = $self->build_web_page($response);
-    my $msg = $self->build_mail_message($response);
-
-    $self->{mime_ptr}->send_mail($mail_fields, $msg, $attachment);
-    return;
 }
 
 1;
