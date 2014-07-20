@@ -47,7 +47,7 @@ sub run {
             if (lc($response->{cmd}) eq 'cancel') {
                 $redirect = 1;
             } elsif ($self->validate_items($response)) {
-                $redirect = $self->write_data($response);
+                $redirect = $self->perform_data($response);
             } 
 
         } else {
@@ -222,6 +222,20 @@ sub parse_validator {
 
     die "Couldn't parse $item->{valid}" unless $parsed;
     return;
+}
+
+#----------------------------------------------------------------------
+# Call method to perform action on data
+
+sub perform_data {
+    my ($self, $response) = @_;
+    
+    my $redirect;
+    if ($self->{code_ptr}->can('perform_data')) {
+        $redirect = $self->{code_ptr}->perform_data($response);
+    }
+    
+    return $redirect;
 }
 
 #----------------------------------------------------------------------
@@ -533,20 +547,6 @@ sub validate_items {
     
     $response->{msg} = join("<br>\n", @message) if @message;
     return @message ? 0 : 1;
-}
-
-#----------------------------------------------------------------------
-# Call method to write data
-
-sub write_data {
-    my ($self, $response) = @_;
-    
-    my $redirect;
-    if ($self->{code_ptr}->can('write_data')) {
-        $redirect = $self->{code_ptr}->write_data($response);
-    }
-    
-    return $redirect;
 }
 
 1;
