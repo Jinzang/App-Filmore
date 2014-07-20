@@ -39,6 +39,16 @@ sub info_data {
 }
 
 #----------------------------------------------------------------------
+# Run the handler
+
+sub perform_data {
+    my ($self, $response) = @_;
+
+    $response->{msg} = "Value in bounds";
+    return;
+}
+
+#----------------------------------------------------------------------
 # Read data associated with a form
 
 sub read_data {
@@ -78,14 +88,4 @@ sub validate_data {
     return;
 }
     
-#----------------------------------------------------------------------
-# Run the handler
-
-sub write_data {
-    my ($self, $response) = @_;
-
-    $response->{msg} = "Value in bounds";
-    return;
-}
-
 1;
