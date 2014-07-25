@@ -1,0 +1,28 @@
+<html>
+<head>
+<title>Edit Page</title>
+</head>
+<body>
+<h2>Edit Page</h2>
+
+<!-- section message -->
+<p>$msg</p>
+<!-- endsection message -->
+
+<!-- section content -->
+<form id="edit_form" method="post" action="$script_url">
+<!-- for @items -->
+<!-- if $type ne 'hidden' -->
+<div class="form-title">$title</div>
+<!-- endif -->
+<div class="form-field">$field</div>
+<!-- endfor -->
+<div>
+<input type="submit" name = "cmd" value="Cancel" />
+<input type="submit" name = "cmd" value="Mail" />
+</div>
+</form>
+
+<!-- endsection content -->
+</body>
+</html>

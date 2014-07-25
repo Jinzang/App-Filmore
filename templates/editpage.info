@@ -1,0 +1,12 @@
+[url]
+valid = &url
+type = hidden
+[email]
+valid = &email
+title = Your email
+[note]
+type = textarea
+title = Explanation of Change
+[body]
+valid = &
+type = textarea
