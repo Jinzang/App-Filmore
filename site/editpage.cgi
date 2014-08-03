@@ -9,17 +9,13 @@ use lib "$Bin/../lib";
 use App::Filmore::CgiHandler;
 use File::Spec::Functions qw(catfile rel2abs splitdir);
 
-my $config_file = $0;
-$config_file =~ s/\.[^\.]+$/\.cfg/;
-
+my $config_file = '';
 my $base_dir = get_base_dir($0);
 my %args = command_line(@ARGV);
 
 my $mailer = App::Filmore::CgiHandler->new(config_file => $config_file,
                                            code_ptr => 'App::Filmore::FormMail',
-                                           base_directory => $base_dir,
-                                           valid_read => [$base_dir], 
-                                          );
+                                         );
 
 my $result = $mailer->run(%args);
 print $result;

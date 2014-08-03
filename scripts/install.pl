@@ -39,8 +39,7 @@ my %defaults = (
                 base_directory => $target,
                 config_file => "$target/*.cfg",
                 template_dir => $templates,
-                valid_read => [$templates],
-                valid_write => [$target],
+                valid_read => [$target],
                );
 
 %parameters = (%defaults, %parameters);
@@ -165,17 +164,6 @@ sub copy_site {
         } else {
             copy_file($input, $output);
             $permissions = $parameters{permissions};
-        }
-
-        if ($file eq 'index.html') {
-            eval "use lib '$library'";
-            eval "require App::Onsite::Editor";
-            
-            my $editor_file = join('/', "$source", EDITOR);
-            my %parameters = update_parameters($editor_file, %parameters);
-            
-            my $editor = App::Onsite::Editor->new(%parameters);
-            $editor->auto_update('');
         }
 
         set_group($output, $parameters{group});

@@ -23,11 +23,12 @@ my %parameters = (
                  );
 
 my $redirect_url;
+my $interactive = is_interactive();
 
 eval {
     $request = get_request(@ARGV);
     if ($request->{error} = check_request($request)) {
-        if (@ARGV) {
+        if ($interactive) {
             query_args($request);
         } else {
             show_form($request);
@@ -42,20 +43,19 @@ if ($@) {
     $request->{error} = $@;
     $request->{dump} = dump_state();
 
-    if (@ARGV) {
+    if ($interactive) {
         print $request->{error}, "\n";
     } else {
         show_form($request);
     }
 
 } else {
-    if (@ARGV) {
+    if ($interactive) {
         print "Scripts initialized\n";
     } else {
         redirect($redirect_url);
     }
 }
-
 
 #----------------------------------------------------------------------
 # Main routine
@@ -164,6 +164,10 @@ sub copy_site {
             push (@scripts, $file);
             my $parameters = update_parameters($file, %parameters);
             $text = edit_script($file, $text, $include, $parameters);
+
+        } elsif ($file =~ /\.cfg$/) {
+            my $parameters = update_parameters($file, %parameters);
+            $text = update_configuration($text, $parameters);
         }
     
         copy_file($mode, $file, $text);
@@ -224,12 +228,10 @@ sub edit_script {
         $text  =~ s/use lib \'(\S+)\'/use lib \'$include->{lib}\'/;
     }
     
-    # Set parameters
+    # Set configuration file
 
-    if ($text =~ /my \$parameters/) {
-        my $dumper = Data::Dumper->new([$parameters], ['parameters']);
-        my $parameters = $dumper->Dump();    
-        $text =~ s/my \$parameters;/my $parameters/;
+    if ($text =~ /my \$config_file/) {
+        $text  =~ s/my \$config_file = \'(\S*)\'/my \$config_file = \'$parameters->{config_file}\'/;
     }
     
     return $text;
@@ -289,6 +291,13 @@ sub get_request {
     }
     
     return \%request;
+}
+
+#----------------------------------------------------------------------
+# Check if script is being run interactively
+
+sub is_interactive {
+    return -t STDIN && -t STDOUT
 }
 
 #----------------------------------------------------------------------
@@ -372,7 +381,7 @@ sub protect_files {
 sub query_args {
     my ($request) = @_;
 
-    print $request->{error}, "\n";
+    print $request->{error}, "\n\n";
     
     print "User";
     print "($request->{user})" if $request->{user};
@@ -552,6 +561,45 @@ EOS
     print("Content-type: text/html\n\n$template");
     
     return;
+}
+
+#----------------------------------------------------------------------
+# Update configuration file
+
+sub update_configuration {
+    my ($text, $parameters) = @_;
+
+    my %done;
+    my @new_lines;
+    my @lines = split(/\n/, $text);
+    
+    foreach my $line (@lines) {
+        if ($line = ~ /^(\s+)\s*=/) {
+            my $var = $1;
+
+            if (! $done{$var}) {
+                if ($parameters->{$var}) {
+                    if (ref $parameters->{$var} eq 'ARRAY') {
+                        foreach my $value (@{$parameters->{$var}}) {
+                            push(@new_lines, "$var = $value");
+                        }
+
+                    } else {
+                        push(@new_lines, "$var = $parameters->{$var}")
+                    }
+                    $done{$var} = 1;
+
+                } else {
+                    push(@new_lines, $line);
+                }
+            }
+            
+        } else {
+            push(@new_lines, $line);
+        }
+    }
+    
+    return join("\n", @new_lines)
 }
 
 #----------------------------------------------------------------------
