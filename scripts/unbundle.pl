@@ -11,67 +11,60 @@ use Data::Dumper;
 use MIME::Base64 qw(decode_base64);
 use File::Spec::Functions qw(catfile splitdir file_name_is_absolute);
 
-my $request;
+use constant DEFAULT_GROUP => '';
+use constant DEFAULT_PERMISSIONS => 0666;
+
 our $modeline;
-
-# Values for script parameters
-# You can change the values or add new ones
-
-my %parameters = (
-                  group => '',
-                  permissions => 0666,
-                 );
-
-my $redirect_url;
 my $interactive = is_interactive();
 
-eval {
-    $request = get_request(@ARGV);
-    if ($request->{error} = check_request($request)) {
-        if ($interactive) {
-            query_args($request);
-        } else {
-            show_form($request);
-        }
+my $request;
+if ($interactive) {
+    $request = get_arguments(@ARGV);
+} else {
+    $request = get_request();
+}
 
+eval {
+    if ($request->{error} = check_request($request)) {
+        show_form($interactive, $request);
     } else {
-        $redirect_url = run($request, %parameters);
+        run($interactive, $request);
     }
 };
 
 if ($@) {
     $request->{error} = $@;
     $request->{dump} = dump_state();
-
-    if ($interactive) {
-        print $request->{error}, "\n";
-    } else {
-        show_form($request);
-    }
-
-} else {
-    if ($interactive) {
-        print "Scripts initialized\n";
-    } else {
-        redirect($redirect_url);
-    }
+    show_form($interactive, $request);
 }
 
 #----------------------------------------------------------------------
 # Main routine
 
 sub run {
-    my ($request, %parameters) = @_;
+    my ($interactive, $request) = @_;
 
     my $include = get_include();
-    %parameters = set_parameters($include, $request, %parameters);
+    my %parameters = set_parameters($include, $request);
     die "Could not compute base_url\n" unless $parameters{base_url};
 
     my $scripts = copy_site($include, %parameters);
     protect_files($include, $request, $scripts, %parameters);
-    unlink($0);
 
-    return $parameters{base_url};
+    if ($interactive) {
+        print "Scripts initialized\n";
+        unlink($0);
+
+    } elsif (-e 'index.html') {
+        redirect($parameters{base_url});
+        unlink($0);
+
+    } else {
+        $request->{error} = "Scripts initialized";
+        show_form($interactive, $request);
+    }
+
+    return;
 }
 
 #----------------------------------------------------------------------
@@ -120,7 +113,31 @@ sub command_line {
     }
 
     $request{pass2} ||= $request{pass1};
-    return %request;
+    return \%request;
+}
+
+#----------------------------------------------------------------------
+# Read the script configuration information
+
+sub configuration_info {
+    my ($file, $text) = @_;
+
+    my $info = {};
+    my %vars = map {$_ => 1} qw(public);
+    my @lines = split(/\n/, $text);
+    my ($basename) = get_basename($file);
+
+    foreach my $line (@lines) {
+        next if $line =~ /^\s*\#/;
+
+        my ($name, $value) = split(/\s*=\s*/, $line);
+        next unless defined $value;
+
+        $value =~ s/\s+$//;
+        $info->{$name} = $value if $vars{$name};
+    }
+
+    return ($basename, $info);    
 }
 
 #----------------------------------------------------------------------
@@ -128,11 +145,12 @@ sub command_line {
 
 sub copy_file {
     my ($mode, $file, $text) = @_;
-    
+
+    return if -e $file;    
     my $out = IO::File->new($file, 'w') or die "Can't write $file";
 
     if ($mode eq 'b') {
-        binmode($out) ;
+        binmode($out);
         my @lines = split(/\n/, $text);
         foreach my $line (@lines) {
             print $out decode_base64($line);
@@ -153,7 +171,7 @@ sub copy_file {
 sub copy_site {
     my ($include, %parameters) = @_;   
 
-    my @scripts;
+    my $scripts = {};
     while (my ($mode, $file, $text) = next_file()) {
         $file = map_filename($include, $file);
         create_dirs($file, \%parameters);        
@@ -161,20 +179,22 @@ sub copy_site {
 
         if ($file =~ /\.cgi$/) {
             $modifiers = 'x';
-            push (@scripts, $file);
             my $parameters = update_parameters($file, %parameters);
             $text = edit_script($file, $text, $include, $parameters);
 
         } elsif ($file =~ /\.cfg$/) {
             my $parameters = update_parameters($file, %parameters);
             $text = update_configuration($text, $parameters);
+
+            my ($basename, $info) = configuration_info($file, $text);
+            $scripts->{$basename} = $info;
         }
     
         copy_file($mode, $file, $text);
         set_permissions($file, \%parameters, $modifiers);
     }
 
-    return \@scripts;
+    return $scripts;
 }
 
 #----------------------------------------------------------------------
@@ -248,6 +268,33 @@ sub encrypt {
 }
 
 #----------------------------------------------------------------------
+# Get the arguments from the command line or interactively
+
+sub get_arguments {
+    my @args = @_;
+    
+    my $request = command_line(@args);
+    while ($request->{error} = check_request($request)) {
+        query_args($request);
+    }
+    
+    return $request;
+}
+
+#----------------------------------------------------------------------
+# Extract basename from filename
+
+sub get_basename {
+    my ($file) = @_;
+    
+    my @path = splitdir($file);
+    my $root = pop(@path);
+    my ($basename, $ext) = split(/\./, $root);
+    
+    return $basename;
+}
+
+#----------------------------------------------------------------------
 # Get the locations of the directories we need
 
 sub get_include {
@@ -271,23 +318,15 @@ sub get_include {
 # Get the request passed to the script
 
 sub get_request {
-    my @args = @_;
-    
-    my %request;
-    if (@args) {
-        %request = command_line(@args);
-        
-    } else {    
-        my $cgi = CGI->new;
-        %request = $cgi->Vars();
+    my $cgi = CGI->new;
+    my %request = $cgi->Vars();
 
-        # Split request parameters when they are arrays
-    
-        foreach my $field (keys %request) {
-            next unless $request{$field} =~ /\000/;
-            my @array = split(/\000/, $request{$field});
-            $request{$field} = \@array;
-        }
+    # Split request parameters when they are arrays
+
+    foreach my $field (keys %request) {
+        next unless $request{$field} =~ /\000/;
+        my @array = split(/\000/, $request{$field});
+        $request{$field} = \@array;
     }
     
     return \%request;
@@ -381,25 +420,22 @@ sub protect_files {
 sub query_args {
     my ($request) = @_;
 
-    print $request->{error}, "\n\n";
+    print $request->{error}, "\n\n" if $request->{error};
     
-    print "User";
-    print "($request->{user})" if $request->{user};
-    print ": ";
-    
-    my $user = <STDIN>;
-    chomp $user;
-    
-    $request->{user} = $user || $request->{user};
+    my @fields = request_fields();
+    for my $field (@fields) {
+        my $name = $field->{name};
 
-    for my $name ('pass1', 'pass2') {
-        print "Password: ";
+        print $field->{title};
+        print "($request->{$name})" if $request->{$name} && $field->{show};
+        print ": ";
+
         my $value = <STDIN>;
         chomp $value;
 
-        $request->{$name} = $value;
+        $request->{$name} = $value || $request->{$name};
     }
-    
+   
     return;
 }
 
@@ -441,6 +477,17 @@ sub rel2abs {
 }
 
 #----------------------------------------------------------------------
+# Get a list of the request fields
+
+sub request_fields {
+    return (
+            {name => 'user', title => 'User Email', show => 1},
+            {name => 'pass1', title => 'Password'},
+            {name => 'pass2', title => 'Repeat Password'},
+           );    
+}
+
+#----------------------------------------------------------------------
 # Set the base url from values in environment variables
 
 sub set_base_url {
@@ -479,24 +526,25 @@ sub set_group  {
 # Set parameters for script
 
 sub set_parameters {
-    my ($include, $request, %parameters) = @_;
+    my ($include, $request) = @_;
 
     my $base_directory = getcwd();
+    my $base_url = set_base_url();
     
-    # Set reasonable defaults for parameters that aren't set above
+    # Set reasonable defaults for parameters
     
-    my %defaults = (
-                    script_url => '*.cgi',
+    my %parameters = (
+                    group => DEFAULT_GROUP,
+                    permissions => DEFAULT_PERMISSIONS,
                     base_directory => $base_directory,
+                    base_url => $base_url,
                     config_file => "*.cfg",
+                    script_url => '*.cgi',
                     site_template => "$include->{templates}/*.htm",
                     valid_read => [$base_directory],
                     web_master => $request->{user},
                    );
-    
-    $defaults{base_url} = set_base_url();
 
-    %parameters = (%defaults, %parameters);
     return %parameters;
 }
 
@@ -522,7 +570,7 @@ sub set_permissions {
 # Show form to get user name and password
 
 sub show_form {
-    my ($request) =  @_;    
+    my ($interactive, $request) =  @_;    
     
     my $template = <<'EOS';
 <head>
@@ -557,8 +605,12 @@ licensed on the same terms as Perl.</p></div>
 </body></html>
 EOS
 
-    $template =~ s/{{([^}]*)}}/$request->{$1} || ''/ge;
-    print("Content-type: text/html\n\n$template");
+    if ($interactive) {
+        print $request->{error}, "\n";
+    } else {
+        $template =~ s/{{([^}]*)}}/$request->{$1} || ''/ge;
+        print("Content-type: text/html\n\n$template");
+    }
     
     return;
 }
@@ -574,32 +626,35 @@ sub update_configuration {
     my @lines = split(/\n/, $text);
     
     foreach my $line (@lines) {
-        if ($line = ~ /^(\s+)\s*=/) {
-            my $var = $1;
+        if ($line =~ /^\s*#/) {
+            push(@new_lines, $line);
 
-            if (! $done{$var}) {
-                if ($parameters->{$var}) {
-                    if (ref $parameters->{$var} eq 'ARRAY') {
-                        foreach my $value (@{$parameters->{$var}}) {
-                            push(@new_lines, "$var = $value");
+        } else {
+            my ($name, $value) = split(/\s*=\s*/, $line);
+ 
+            if (! defined $value) {
+                push(@new_lines, $line);
+
+            } elsif (! $done{$name}) {
+                if ($parameters->{$name}) {
+                    if (ref $parameters->{$name} eq 'ARRAY') {
+                        foreach my $val (@{$parameters->{$name}}) {
+                            push(@new_lines, "$name = $val");
                         }
 
                     } else {
-                        push(@new_lines, "$var = $parameters->{$var}")
+                        push(@new_lines, "$name = $parameters->{$name}")
                     }
-                    $done{$var} = 1;
+                    $done{$name} = 1;
 
                 } else {
                     push(@new_lines, $line);
                 }
             }
-            
-        } else {
-            push(@new_lines, $line);
         }
     }
     
-    return join("\n", @new_lines)
+    return join("\n", @new_lines) . "\n";
 }
 
 #----------------------------------------------------------------------
@@ -608,7 +663,7 @@ sub update_configuration {
 sub update_parameters {
     my ($file, %parameters) = @_;
 
-    my ($basename) = $file =~ /(\w+)\.\w+$/;
+    my ($basename) = get_basename($file);
     
     while (my ($name, $value) = each %parameters) {
         $value =~ s/\*/$basename/;
