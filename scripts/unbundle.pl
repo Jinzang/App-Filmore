@@ -49,7 +49,7 @@ sub run {
     die "Could not compute base_url\n" unless $parameters{base_url};
 
     my $scripts = copy_site($include, %parameters);
-    protect_files($include, $request, $scripts, %parameters);
+    protect_files($include, $request, $scripts, \%parameters);
 
     if ($interactive) {
         print "Scripts initialized\n";
@@ -146,7 +146,6 @@ sub configuration_info {
 sub copy_file {
     my ($mode, $file, $text) = @_;
 
-    return if -e $file;    
     my $out = IO::File->new($file, 'w') or die "Can't write $file";
 
     if ($mode eq 'b') {
@@ -190,7 +189,7 @@ sub copy_site {
             $scripts->{$basename} = $info;
         }
     
-        copy_file($mode, $file, $text);
+        copy_file($mode, $file, $text);    
         set_permissions($file, \%parameters, $modifiers);
     }
 
@@ -399,15 +398,16 @@ sub next_file {
 # Protect the files with access and password files
 
 sub protect_files {
-    my ($include, $request, $scripts, %parameters) = @_;
+    my ($include, $request, $scripts, $parameters) = @_;
 
     while (my($source, $target) = each %$include) {
         if ($source eq 'site') {
-            ##write_access_file($parameters, $target, $scripts);
-            ##write_password_file($parameters, $target, $request);
+            write_access_file($target, $scripts, $parameters);
+            write_group_file($target, $request, $scripts, $parameters);
+            write_password_file($target, $request, $parameters);
 
         } else {
-            write_no_access_file(\%parameters, $target);
+            write_no_access_file($target, $parameters);
         }
     }
     
@@ -438,6 +438,78 @@ sub query_args {
    
     return;
 }
+
+#----------------------------------------------------------------------
+# Read the access control file up until a files command is seen
+
+sub read_access_file {
+    my ($file) = @_;
+    
+    my $fd;
+    $fd = IO::File->($file, 'r') if -e $file;
+    my @lines = ('');
+
+    if ($fd) {
+        while (<$fd>) {
+            last if /^<Files/;
+            push(@lines, $_);
+        }
+
+        close $fd;
+    }
+
+    return join('', @lines);
+}
+
+#----------------------------------------------------------------------
+# Read the groups files
+
+sub read_groups_file {
+    my ($file, $scripts) = @_;    
+
+    my $fd;
+    $fd = IO::File->($file, 'r') if -e $file;
+ 
+    if ($fd) {
+        while (<$fd>) {
+            chomp;
+            my ($group, $user_list) = split(/\s*:\s*/, $_, 2);
+            next unless $group && exists $scripts->{$group};
+            
+            my %users = map {$_ => 1} split(' ', $user_list);
+            $scripts->{$group}{users} = \%users;
+        }
+
+        close $fd;
+    }
+    
+    return $scripts;
+ }
+
+#----------------------------------------------------------------------
+# Read the current password file into a hash
+
+sub read_password_file {
+    my ($file, $scripts) = @_;    
+
+    my $fd;
+    my %passwords;
+    $fd = IO::File->($file, 'r') if -e $file;
+ 
+    if ($fd) {
+        while (<$fd>) {
+            chomp;
+            my ($user, $password) = split(/\s*:\s*/, $_, 2);
+            next unless $password;
+            
+            $passwords{$user} = $password;
+        }
+
+        close $fd;
+    }
+    
+    return $scripts;
+ }
 
 #----------------------------------------------------------------------
 # Redirect browser to url
@@ -677,21 +749,55 @@ sub update_parameters {
 # Write access file for password protected site
 
 sub write_access_file {
-    my ($parameters, $directory) = @_;
+    my ($directory, $scripts, $parameters) = @_;
 
     my $file = "$directory/.htaccess";
+
+    my $text = read_access_file($file);
+    
     my $fd = IO::File->new($file, 'w')
         or die "Can't open $file: $!\n";
 
-    print $fd <<"EOS";
-<Files "editor.cgi">
-AuthName "Restricted Command" 
-AuthType Basic 
-AuthUserFile $directory/.htpasswd 
-AuthGroupFile /dev/null 
-require valid-user
+    print $text;
+    foreach my $basename (keys %$scripts) {
+        next if $scripts->{$basename}{public};
+        
+        print $fd <<"EOS";
+<Files "$basename.cgi">
+  AuthName "Password Required"
+  AuthType Basic
+  AuthUserFile $directory/.htpasswd
+  AuthGroupFile $directory/.htgroups
+  Require group $basename
 </Files>
 EOS
+    }
+
+    close($fd);
+    set_permissions($file, $parameters);  
+    return;
+}
+
+#----------------------------------------------------------------------
+# Write group file for password protected site
+
+sub write_group_file {
+    my ($directory, $request, $scripts, $parameters) = @_;
+
+    my $file = "$directory/.htgroups";
+    $scripts = read_groups_file($file, $scripts);
+ 
+    my $fd = IO::File->new($file, 'w')
+        or die "Can't open $file: $!\n";
+
+    my $user = $request->{user};
+    foreach my $basename (keys %$scripts) {
+        next if $scripts->{$basename}{public};
+        $scripts->{$basename}{users}{$user} = 1;
+ 
+        my $user_list = join(' ', sort keys $scripts->{$basename}{users});
+        print $fd "$basename: $user_list\n";
+    }
 
     close($fd);
     set_permissions($file, $parameters);  
@@ -702,7 +808,7 @@ EOS
 # Write file that blocks access to site
 
 sub write_no_access_file {
-    my ($parameters, $directory) = @_;
+    my ($directory, $parameters) = @_;
 
     my $file = "$directory/.htaccess";
     my $fd = IO::File->new($file, 'w')
@@ -728,13 +834,20 @@ EOS
 # Write password file
 
 sub write_password_file {
-    my ($parameters, $directory, $request) = @_;
+    my ($directory, $request, $parameters)= @_;
 
     my $file = "$directory/.htpasswd";
+    my $passwords = read_password_file($file);
+    $passwords->{$request->{user}} = encrypt($request->{pass1});
+    
     my $fd = IO::File->new($file, 'w')
         or die "Can't open $file: $!\n";
    
-    print $fd $request->{user}, ':', encrypt($request->{pass1}), "\n";
+    foreach my $user (sort keys %$passwords) {
+        my $password = $passwords->{$user};
+        print $fd "$user:$password\n";
+    }
+
     close($fd);
     set_permissions($file, $parameters);  
 
