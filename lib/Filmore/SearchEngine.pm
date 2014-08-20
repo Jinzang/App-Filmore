@@ -5,10 +5,10 @@ use integer;
 #----------------------------------------------------------------------
 # Search engine back end
 
-package App::Filmore::SearchEngine;
+package Filmore::SearchEngine;
 
 use lib '../../../lib';
-use base qw(App::Filmore::ConfiguredObject);
+use base qw(Filmore::ConfiguredObject);
 
 our $VERSION = '0.01';
 
@@ -29,8 +29,8 @@ sub parameters {
         number_results => 20,
         context_length => 80,
         body_tag => 'content',
-        template_ptr => 'App::Filmore::SimpleTemplate',
-        webfile_ptr => 'App::Filmore::WebFile',
+        template_ptr => 'Filmore::SimpleTemplate',
+        webfile_ptr => 'Filmore::WebFile',
 	);
 
     return %parameters;

@@ -20,7 +20,7 @@ unshift(@INC, $lib);
 $lib = catdir(@path, 't');
 unshift(@INC, $lib);
 
-require App::Filmore::CgiHandler;
+require Filmore::CgiHandler;
 
 my $base_dir = catdir(@path, 'test');
 my $subdir = catfile($base_dir, 'sub');
@@ -46,9 +46,9 @@ my %params = (
                 code_ptr => 'MinMax'
              );
 
-my $o = App::Filmore::CgiHandler->new(%params);
+my $o = Filmore::CgiHandler->new(%params);
 
-isa_ok($o, "App::Filmore::CgiHandler"); # test 1
+isa_ok($o, "Filmore::CgiHandler"); # test 1
 can_ok($o, qw(run)); # test 2
 
 #----------------------------------------------------------------------
@@ -89,7 +89,7 @@ do {
     $o->{base_url} = '';
 
     $request = {};
-    my $bare = App::Filmore::CgiHandler->new();
+    my $bare = Filmore::CgiHandler->new();
     $request = $bare->read_urls($request);
     $request_ok = {base_url => '/t/',
                    referer_url => '/t/',

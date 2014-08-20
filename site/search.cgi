@@ -6,7 +6,7 @@ use warnings;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 
-use App::Filmore::CgiHandler;
+use Filmore::CgiHandler;
 use File::Spec::Functions qw(catfile splitdir);
 
 my $config_file = $0;
@@ -14,8 +14,8 @@ $config_file =~ s/\.[^\.]+$/\.cfg/;
 
 my $base_dir = get_base_dir($0);
 
-my $search = App::Filmore::CgiHandler->new(config_file => $config_file,
-                                           code_ptr => 'App::Filmore::SearchEngine',
+my $search = Filmore::CgiHandler->new(config_file => $config_file,
+                                           code_ptr => 'Filmore::SearchEngine',
                                            base_dir => $base_dir,
                                            script_dir => $base_dir,
                                            valid_write => [$base_dir], 

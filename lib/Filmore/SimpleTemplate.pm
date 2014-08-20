@@ -1,10 +1,10 @@
 use strict;
 use warnings;
 
-package App::Filmore::SimpleTemplate;
+package Filmore::SimpleTemplate;
 
 use lib '../../../lib';
-use base qw(App::Filmore::ConfiguredObject);
+use base qw(Filmore::ConfiguredObject);
 use IO::File;
 
 our $VERSION = '0.01';
@@ -25,7 +25,7 @@ sub parameters {
 	my ($pkg) = @_;
 
 	return (
-            webfile_ptr => 'App::Filmore::WebFile',
+            webfile_ptr => 'Filmore::WebFile',
             );
 }
 

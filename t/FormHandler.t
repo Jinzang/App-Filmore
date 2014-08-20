@@ -21,7 +21,7 @@ unshift(@INC, $lib);
 $lib = catdir(@path, 't');
 unshift(@INC, $lib);
 
-require App::Filmore::FormHandler;
+require Filmore::FormHandler;
 require MinMax;
 
 my $base_dir = catdir(@path, 'test');
@@ -32,7 +32,7 @@ chdir $base_dir;
 $base_dir = getcwd();
 
 my $config_file = "$base_dir/config.cfg";
-my $fh = App::Filmore::FormHandler->new(code_ptr => 'MinMax');
+my $fh = Filmore::FormHandler->new(code_ptr => 'MinMax');
 
 #----------------------------------------------------------------------
 # Create object

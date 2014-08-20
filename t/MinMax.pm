@@ -8,7 +8,7 @@ use integer;
 package MinMax;
 
 use lib '../lib';
-use base qw(App::Filmore::ConfiguredObject);
+use base qw(Filmore::ConfiguredObject);
 
 #----------------------------------------------------------------------
 # Set default parameters

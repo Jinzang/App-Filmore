@@ -20,8 +20,8 @@ unshift(@INC, $lib);
 $lib = catdir(@path, 't');
 unshift(@INC, $lib);
 
-require App::Filmore::ConfiguredObject;
-require App::Filmore::ConfigFile;
+require Filmore::ConfiguredObject;
+require Filmore::ConfigFile;
 require MinMax;
 
 my $base_dir = catdir(@path, 'test');
@@ -42,7 +42,7 @@ my %parameters = (
 #----------------------------------------------------------------------
 # Test new
 
-my $cf = App::Filmore::ConfigFile->new(%parameters);
+my $cf = Filmore::ConfigFile->new(%parameters);
 $cf->write_file(\%parameters);
 
 can_ok($cf, qw(new parameters)); #test 1

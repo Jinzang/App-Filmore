@@ -1,10 +1,10 @@
 use strict;
 use warnings;
 
-package App::Filmore::FormHandler;
+package Filmore::FormHandler;
 
 use lib '../../../lib';
-use base qw(App::Filmore::ConfiguredObject);
+use base qw(Filmore::ConfiguredObject);
 use IO::File;
 
 our $VERSION = '0.01';
@@ -23,8 +23,8 @@ sub parameters {
     return (
         site_template => '',
         body_tag => 'content',
-        template_ptr => 'App::Filmore::SimpleTemplate',
-        webfile_ptr => 'App::Filmore::WebFile',
+        template_ptr => 'Filmore::SimpleTemplate',
+        webfile_ptr => 'Filmore::WebFile',
         code_ptr => '',
     );
 }

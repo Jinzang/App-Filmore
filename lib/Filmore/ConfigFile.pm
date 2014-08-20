@@ -2,10 +2,10 @@ use strict;
 use warnings;
 use integer;
 
-package App::Filmore::ConfigFile;
+package Filmore::ConfigFile;
 
 use lib '../../../lib';
-use base qw(App::Filmore::ConfiguredObject);
+use base qw(Filmore::ConfiguredObject);
 use IO::File;
 
 our $VERSION = '0.01';
@@ -114,12 +114,12 @@ sub write_file {
 __END__
 =head1 NAME
 
-App::Filmore::ConfigFile reads and writes configuration files
+Filmore::ConfigFile reads and writes configuration files
 
 =head1 SYNOPSIS
 
-	use App::Filmore::ConfigFile;
-    $obj = App::Filmore::ConfigFile->new(config_file => 'example.cfg');
+	use Filmore::ConfigFile;
+    $obj = Filmore::ConfigFile->new(config_file => 'example.cfg');
     my $configuration = $obj->read_file();
     $obj->write_file($configuration);
 

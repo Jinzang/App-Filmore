@@ -5,7 +5,7 @@ use integer;
 #----------------------------------------------------------------------
 # Create an object that handles file operations
 
-package App::Filmore::WebFile;
+package Filmore::WebFile;
 
 use Cwd;
 use IO::Dir;
@@ -15,7 +15,7 @@ use Digest::MD5 qw(md5_hex);
 use File::Spec::Functions qw(abs2rel catfile rel2abs splitdir);
 
 use lib '../../../lib';
-use base qw(App::Filmore::ConfiguredObject);
+use base qw(Filmore::ConfiguredObject);
 
 use constant VALID_NAME => qr(^([a-z][\-\w]*\.?\w*)$);
 
@@ -444,7 +444,7 @@ sub write_wo_validation{
 __END__
 =head1 NAME
 
-App::Filmore::WebFile encapsulates file i/o
+Filmore::WebFile encapsulates file i/o
 
 =head1 SYNOPSIS
 

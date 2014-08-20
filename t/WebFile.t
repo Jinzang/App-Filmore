@@ -20,7 +20,7 @@ pop(@path);
 my $lib = catdir(@path, 'lib');
 unshift(@INC, $lib);
 
-require App::Filmore::WebFile;
+require Filmore::WebFile;
 
 my $data_dir = catdir(@path, 'test');
 
@@ -34,7 +34,7 @@ mkdir($script_dir);
 #----------------------------------------------------------------------
 # Create object
 
-BEGIN {use_ok("App::Filmore::WebFile");} # test 1
+BEGIN {use_ok("Filmore::WebFile");} # test 1
 
 my $base_url = 'http://www.example.com/';
 
@@ -45,9 +45,9 @@ my $params = {
               valid_write => [$data_dir, $script_dir,],
              };
 
-my $wf = App::Filmore::WebFile->new(%$params);
+my $wf = Filmore::WebFile->new(%$params);
 
-isa_ok($wf, "App::Filmore::WebFile"); # test 2
+isa_ok($wf, "Filmore::WebFile"); # test 2
 can_ok($wf, qw(relocate reader writer validate_filename)); # test 3
 
 #----------------------------------------------------------------------

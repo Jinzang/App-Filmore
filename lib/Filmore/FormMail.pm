@@ -1,10 +1,10 @@
 use strict;
 use warnings;
 
-package App::Filmore::FormMail;
+package Filmore::FormMail;
 
 use lib '../../../lib';
-use base qw(App::Filmore::ConfiguredObject);
+use base qw(Filmore::ConfiguredObject);
 
 our $VERSION = '0.01';
 
@@ -30,9 +30,9 @@ sub parameters {
         body_tag => 'content',
         template_directory => 'templates',
         mail_template => DEFAULT_MAIL_TEMPLATE,
-        template_ptr => 'App::Filmore::SimpleTemplate',
-        webfile_ptr => 'App::Filmore::WebFile',
-        mime_ptr => 'App::Filmore::MimeMail',
+        template_ptr => 'Filmore::SimpleTemplate',
+        webfile_ptr => 'Filmore::WebFile',
+        mime_ptr => 'Filmore::MimeMail',
     );
 }
 

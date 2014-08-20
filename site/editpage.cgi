@@ -6,15 +6,15 @@ use warnings;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 
-use App::Filmore::CgiHandler;
+use Filmore::CgiHandler;
 use File::Spec::Functions qw(catfile rel2abs splitdir);
 
 my $config_file = '';
 my $base_dir = get_base_dir($0);
 my %args = command_line(@ARGV);
 
-my $mailer = App::Filmore::CgiHandler->new(config_file => $config_file,
-                                           code_ptr => 'App::Filmore::FormMail',
+my $mailer = Filmore::CgiHandler->new(config_file => $config_file,
+                                           code_ptr => 'Filmore::FormMail',
                                          );
 
 my $result = $mailer->run(%args);

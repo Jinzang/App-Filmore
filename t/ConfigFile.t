@@ -18,7 +18,7 @@ pop(@path);
 my $lib = catdir(@path, 'lib');
 unshift(@INC, $lib);
 
-require App::Filmore::ConfigFile;
+require Filmore::ConfigFile;
 
 my $base_dir = catdir(@path, 'test');
 
@@ -47,7 +47,7 @@ close($io);
 #----------------------------------------------------------------------
 # Test io
 
-my $cf = App::Filmore::ConfigFile->new(config_file => $config_file);
+my $cf = Filmore::ConfigFile->new(config_file => $config_file);
 
 my $configuration = {};
 $cf->read_file($configuration);

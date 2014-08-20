@@ -17,7 +17,7 @@ pop(@path);
 my $lib = catdir(@path, 'lib');
 unshift(@INC, $lib);
 
-require App::Filmore::SimpleTemplate;
+require Filmore::SimpleTemplate;
 
 my $test_dir = catdir(@path, 'test');
 
@@ -43,7 +43,7 @@ do {
 </html>
 EOQ
 
-    my $st = App::Filmore::SimpleTemplate->new();
+    my $st = Filmore::SimpleTemplate->new();
     for my $count (qw(first second third)) {
         my $text = $template;
         my $ucount = ucfirst($count);
@@ -90,7 +90,7 @@ EOQ
 </html>
 EOQ
 
-    my $st = App::Filmore::SimpleTemplate->new();
+    my $st = Filmore::SimpleTemplate->new();
     my $section = $st->parse_sections($text);
     my $section_ok = {header => "\n<title>My Title</title>\n",
                       content => "\n<p>My content.</p>\n"};
@@ -112,7 +112,7 @@ $name $phone
 <!-- endfor -->
 EOQ
     
-    my $st = App::Filmore::SimpleTemplate->new();
+    my $st = Filmore::SimpleTemplate->new();
     my $sub = $st->compile_code($template);
 
     my $data = {list => [{name => 'Ann', phone => '4444'},
@@ -142,7 +142,7 @@ do {
 <!-- endif -->
 EOQ
     
-    my $st = App::Filmore::SimpleTemplate->new();
+    my $st = Filmore::SimpleTemplate->new();
     my $sub = $st->compile_code($template);
     
     my $data = {x => 1};

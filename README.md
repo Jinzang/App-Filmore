@@ -1,14 +1,14 @@
 # NAME
 
-App::Filmore - Server side support for CGI scripting 
+Filmore - Server side support for CGI scripting 
 
 # SYNOPSIS
 
-    use App::Filmore;
+    use Filmore;
 
 # DESCRIPTION
 
-App::Filmore is a collection of modules used to support cgi scripting on
+Filmore is a collection of modules used to support cgi scripting on
 a web server. So far only the lowest level modules, which support reading
 object parameters from a configuration file, are done.
 

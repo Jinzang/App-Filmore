@@ -17,7 +17,7 @@ pop(@path);
 my $lib = catdir(@path, 'lib');
 unshift(@INC, $lib);
 
-require App::Filmore::SearchEngine;
+require Filmore::SearchEngine;
 
 my $test_dir = catdir(@path, 'test');
 
@@ -26,7 +26,7 @@ mkdir $test_dir;
 chdir($test_dir);
 
 my %params = (valid_write => [$test_dir]);
-my $se = App::Filmore::SearchEngine->new(%params);
+my $se = Filmore::SearchEngine->new(%params);
 
 #----------------------------------------------------------------------
 # Create test data

@@ -17,7 +17,7 @@ pop(@path);
 my $lib = catdir(@path, 'lib');
 unshift(@INC, $lib);
 
-require App::Filmore::FormMail;
+require Filmore::FormMail;
 
 my $test_dir = catdir(@path, 'test');
 my $template_dir = catdir(@path, 'test', 'templates');
@@ -33,8 +33,8 @@ my %params = (
               web_master => 'busy@body.com',
               );
 
-my $fm = App::Filmore::FormMail->new(%params);
-my $wf = App::Filmore::WebFile->new(%params);
+my $fm = Filmore::FormMail->new(%params);
+my $wf = Filmore::WebFile->new(%params);
 
 #----------------------------------------------------------------------
 # Create test files

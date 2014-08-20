@@ -5,10 +5,10 @@ use warnings;
 # A wrapper for a class that handles a CGI request (Handler)
 # Handler must have a run method
 
-package App::Filmore::CgiHandler;
+package Filmore::CgiHandler;
 
 use lib '../../../lib';
-use base qw(App::Filmore::ConfiguredObject);
+use base qw(Filmore::ConfiguredObject);
 use IO::File;
 
 use Data::Dumper;
@@ -51,8 +51,8 @@ sub parameters {
             script_url => '',
             detail_errors => 1,
             protocol => 'text/html',
-            form_ptr => 'App::Filmore::FormHandler',
-            webfile_ptr => 'App::Filmore::WebFile',
+            form_ptr => 'Filmore::FormHandler',
+            webfile_ptr => 'Filmore::WebFile',
 	);
 }
 

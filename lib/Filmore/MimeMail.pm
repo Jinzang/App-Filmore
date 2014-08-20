@@ -4,14 +4,14 @@ use warnings;
 #----------------------------------------------------------------------
 # Wrapper for MIME_Mail
 
-package App::Filmore::MimeMail;
+package Filmore::MimeMail;
 
 use lib '../../../lib';
-use base qw(App::Filmore::ConfiguredObject);
+use base qw(Filmore::ConfiguredObject);
 
 our $VERSION = '0.01';
 
-use App::Filmore::MIME_Lite;
+use Filmore::MIME_Lite;
 
 #----------------------------------------------------------------------
 # Set the default parameter values

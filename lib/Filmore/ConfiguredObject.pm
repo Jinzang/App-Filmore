@@ -2,7 +2,7 @@ use strict;
 use warnings;
 use integer;
 
-package App::Filmore::ConfiguredObject;
+package Filmore::ConfiguredObject;
 
 our $VERSION = '0.01';
 
@@ -14,7 +14,7 @@ use Scalar::Util qw(blessed weaken);
 sub new {
 	my ($pkg, %configuration) = @_;
     
-	my $self = bless({}, 'App::Filmore::ConfiguredObject');
+	my $self = bless({}, 'Filmore::ConfiguredObject');
 	$self->populate_object(\%configuration);
     
     $self = bless($self, $pkg);
@@ -28,7 +28,7 @@ sub new {
 
 sub parameters {
 	my ($pkg) = @_;
-	return (config_ptr => 'App::Filmore::ConfigFile');
+	return (config_ptr => 'Filmore::ConfigFile');
 }
 
 #----------------------------------------------------------------------
@@ -44,7 +44,7 @@ sub create_object {
         } else {
             $self->load_class($field, $class);
             
-            if ($class->isa('App::Filmore::ConfiguredObject')) {
+            if ($class->isa('Filmore::ConfiguredObject')) {
                 my $obj = bless({}, $class);
                 $configuration->{$field} = $obj;   
                 $obj->populate_object($configuration);
@@ -133,11 +133,11 @@ sub populate_object {
 __END__
 =head1 NAME
 
-App::Filmore::ConfiguredObject is the base class for configured objects
+Filmore::ConfiguredObject is the base class for configured objects
 
 =head1 SYNOPSIS
 
-	use App::Filmore::ConfiguredObject;
+	use Filmore::ConfiguredObject;
     $obj = $pkg->new(par1 => 'val1',
                      par2 => 'val2',
                      config_file => 'example.cfg');

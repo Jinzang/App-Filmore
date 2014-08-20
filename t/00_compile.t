@@ -11,14 +11,14 @@ my $lib = catdir(@path, 'lib');
 unshift(@INC, $lib);
 
 use_ok $_ for qw(
-    App::Filmore::CgiHandler
-    App::Filmore::ConfigFile
-    App::Filmore::ConfiguredObject
-    App::Filmore::FormHandler
-    App::Filmore::FormMail
-    App::Filmore::SearchEngine
-    App::Filmore::SimpleTemplate
-    App::Filmore::WebFile
+    Filmore::CgiHandler
+    Filmore::ConfigFile
+    Filmore::ConfiguredObject
+    Filmore::FormHandler
+    Filmore::FormMail
+    Filmore::SearchEngine
+    Filmore::SimpleTemplate
+    Filmore::WebFile
 );
 
 done_testing;
