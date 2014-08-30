@@ -282,22 +282,22 @@ do {
     
     $request->{value} = 7;
     my $response = $fh->run($request);
-    like($response->{results}, qr/Value in bounds/,
+    like($response->content, qr/Value in bounds/,
          "Run valid request"); # test 42
     
     $request->{value} = 25;
     $response = $fh->run($request);
-    like($response->{results}, qr/Value out of bounds/,
+    like($response->content, qr/Value out of bounds/,
          "Run invalid request"); # test 43
     
     delete $request->{value};
     $response = $fh->run($request);
-    like($response->{results}, qr/Required field value is missing/,
+    like($response->content, qr/Required field value is missing/,
          "Run empty request"); # test 44
     
     delete $request->{cmd};
     $response = $fh->run($request);
-    like($response->{results}, qr/Please enter a value/,
+    like($response->content, qr/Please enter a value/,
          "Run request with no commands"); # test 45
     
 };

@@ -16,6 +16,7 @@ use_ok $_ for qw(
     Filmore::ConfiguredObject
     Filmore::FormHandler
     Filmore::FormMail
+    Filmore::Response
     Filmore::SearchEngine
     Filmore::SimpleTemplate
     Filmore::WebFile

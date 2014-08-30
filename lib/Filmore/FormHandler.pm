@@ -3,16 +3,18 @@ use warnings;
 
 package Filmore::FormHandler;
 
-use lib '../../../lib';
+use lib '../../lib';
 use base qw(Filmore::ConfiguredObject);
-use IO::File;
 
 our $VERSION = '0.01';
 
-use CGI qw(:cgi-lib :form);
 use Cwd;
+use IO::File;
 use File::Spec::Functions qw(abs2rel catfile rel2abs splitdir);
 use Scalar::Util qw(looks_like_number);
+use CGI qw(:cgi-lib :form);
+
+use Filmore::Response;
 
 #----------------------------------------------------------------------
 # Set the default parameter values
@@ -33,42 +35,42 @@ sub parameters {
 # Main procedure
 
 sub run {
-    my ($self, $request) = @_;
+    my ($self, $request, $response) = @_;
 
-    my $response = {};
-    %$response = %$request;
+    my $results = {};
+    %$results = %$request;
 
-    $response->{items} = $self->{code_ptr}->info_data($response);
-    $self->update_response_items($response, $request);
+    $results->{items} = $self->{code_ptr}->info_data($results);
+    $self->update_result_items($results, $request);
 
     my $redirect;
     eval{
-        if (exists $response->{cmd}) {
-            if (lc($response->{cmd}) eq 'cancel') {
+        if (exists $results->{cmd}) {
+            if (lc($results->{cmd}) eq 'cancel') {
                 $redirect = 1;
-            } elsif ($self->validate_items($response)) {
-                $redirect = $self->perform_data($response);
+            } elsif ($self->validate_items($results)) {
+                $redirect = $self->perform_data($results);
             } 
 
         } else {
-            $self->read_data($response);        
-            $self->update_response_items($response);
+            $self->read_data($results);        
+            $self->update_result_items($results);
         }
     };
 
-    $response->{msg} = $@ if $@;
+    $response = Filmore::Response->new() unless $response;
+    $results->{msg} = $@ if $@;
     
     # Redirect back to edited page if flag is set
     # otherwise generate the form
 
     if ($redirect) {
-        $response->{code} = 302;
-        $response->{msg} ||= 'Found';
+        $response->code(302);
+        $response->header('Location', $results->{url});
 
     } else {
-        $response->{code} = 200;
-        $response->{msg} ||= '';
-        $response->{results} = $self->build_form($response);
+        $response->code(200);
+        $response->content($self->build_form($results));
     }
 
     return $response;
@@ -143,21 +145,21 @@ sub build_field {
 # Build the form that gats tuser input
 
 sub build_form {
-    my ($self, $response) = @_;
+    my ($self, $results) = @_;
 
-    # Add for fields to response
-    $response = $self->build_form_fields($response);
+    # Add for fields to results
+    $results = $self->build_form_fields($results);
 
     # Figure out which templates we have
 
     my @templates;   
     push(@templates, $self->{site_template}) if $self->{site_template};
-    push(@templates, $self->template_data($response));
+    push(@templates, $self->template_data($results));
 
     # Generate page
 
     my $sub = $self->{template_ptr}->compile_code(@templates);
-    my $results = &$sub($response);
+    $results = &$sub($results);
 
     return $results;
 }
@@ -166,27 +168,27 @@ sub build_form {
 # Add the fields on the form
 
 sub build_form_fields {
-    my ($self, $response) = @_;
+    my ($self, $results) = @_;
 
-    foreach my $item (@{$response->{items}}) {
+    foreach my $item (@{$results->{items}}) {
         next if $item->{name} eq 'cmd';
         
         $item->{title} = $item->{title} || ucfirst($item->{name});
         $item->{field} = $self->build_field($item);
     }
 
-    return $response;
+    return $results;
 }
 
 #----------------------------------------------------------------------
 # Get the info about the fields to be displayed in the form
 
 sub info_data {
-    my ($self, $response) = @_;
+    my ($self, $results) = @_;
     
     my $info;
     if ($self->{code_ptr}->can('info_data')) {
-        $info = $self->{code_ptr}->info_data($response);
+        $info = $self->{code_ptr}->info_data($results);
     } else {
         die "No info about form fields";
     }
@@ -228,23 +230,23 @@ sub parse_validator {
 # Call method to perform action on data
 
 sub perform_data {
-    my ($self, $response) = @_;
+    my ($self, $results) = @_;
     
     my $redirect;
     if ($self->{code_ptr}->can('perform_data')) {
-        $redirect = $self->{code_ptr}->perform_data($response);
+        $redirect = $self->{code_ptr}->perform_data($results);
     }
     
     return $redirect;
 }
 
 #----------------------------------------------------------------------
-# Read the file and extract the content, put into response body field
+# Read the file and extract the content, put into results body field
 
 sub populate_items {
-    my ($self, $response) = @_;
+    my ($self, $results) = @_;
 
-    my $filename = $self->{webfile_ptr}->url_to_filename($response->{url});
+    my $filename = $self->{webfile_ptr}->url_to_filename($results->{url});
     my $text = $self->{webfile_ptr}->reader($filename);
 
     my $section = $self->{template_ptr}->parse_sections($text);
@@ -252,7 +254,7 @@ sub populate_items {
     my $body = $section->{$self->{body_tag}};
     $self->{body} = $body;
     
-    foreach my $item (@{$response->{items}}) {
+    foreach my $item (@{$results->{items}}) {
         if ($item->{name} eq 'body') {
             $item->{value} = $body;
             last;
@@ -266,10 +268,10 @@ sub populate_items {
 # Read the data to be displayed in the form
 
 sub read_data {
-    my ($self, $response) = @_;
+    my ($self, $results) = @_;
     
     if ($self->{code_ptr}->can('read_data')) {
-        $self->{code_ptr}->read_data($response);
+        $self->{code_ptr}->read_data($results);
     }
     
     return;
@@ -279,11 +281,11 @@ sub read_data {
 # Get the subtemplate used to render the file
 
 sub template_data {
-    my ($self, $response) = @_;
+    my ($self, $results) = @_;
     
     my $subtemplate;
     if ($self->{code_ptr}->can('template_data')) {
-        $subtemplate = $self->{code_ptr}->template_data($response);
+        $subtemplate = $self->{code_ptr}->template_data($results);
     } else {
         die "No template data";
     }
@@ -303,19 +305,19 @@ sub trim_value {
 }
 
 #----------------------------------------------------------------------
-# Initialize the response hash from the request
+# Initialize the results hash from the request
 
-sub update_response_items {
-    my ($self, $response, $request) = @_;
-    $request = $response unless defined $request;
+sub update_result_items {
+    my ($self, $results, $request) = @_;
+    $request = $results unless defined $request;
     
-    foreach my $item (@{$response->{items}}) {
+    foreach my $item (@{$results->{items}}) {
         my $field = $item->{name};
         if (exists $request->{$field}) {
             $item->{value} = $request->{$field};
 
         } else {
-            $response->{$field} = '';
+            $results->{$field} = '';
             $item->{value} = '';
         }
     }
@@ -508,14 +510,14 @@ sub validate {
 }
 
 #----------------------------------------------------------------------
-# Call method to validate response if it is present
+# Call method to validate results if it is present
 
 sub validate_data {
-    my ($self, $response) = @_;
+    my ($self, $results) = @_;
     
     my $msg;
     if ($self->{code_ptr}->can('validate_data')) {
-        $msg = $self->{code_ptr}->validate_data($response);
+        $msg = $self->{code_ptr}->validate_data($results);
     }
     
     return $msg;
@@ -525,10 +527,10 @@ sub validate_data {
 # Validate the items contained on a form
 
 sub validate_items {
-    my ($self, $response) = @_;
+    my ($self, $results) = @_;
 
     my @message;
-    foreach my $item (@{$response->{items}}) {
+    foreach my $item (@{$results->{items}}) {
         $self->parse_validator($item);
 
         my $msg;
@@ -542,10 +544,10 @@ sub validate_items {
         push(@message, $msg) if $msg;
     }
 
-    my $msg = $self->validate_data($response);
+    my $msg = $self->validate_data($results);
     push(@message, $msg) if $msg;
     
-    $response->{msg} = join("<br>\n", @message) if @message;
+    $results->{msg} = join("<br>\n", @message) if @message;
     return @message ? 0 : 1;
 }
 
