@@ -7,7 +7,7 @@ use integer;
 
 package Filmore::SearchEngine;
 
-use lib '../../../lib';
+use lib '../../lib';
 use base qw(Filmore::ConfiguredObject);
 
 our $VERSION = '0.01';

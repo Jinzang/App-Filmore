@@ -4,7 +4,7 @@ use integer;
 
 package Filmore::ConfigFile;
 
-use lib '../../../lib';
+use lib '../../lib';
 use base qw(Filmore::ConfiguredObject);
 use IO::File;
 

@@ -3,7 +3,7 @@ use warnings;
 
 package Filmore::FormMail;
 
-use lib '../../../lib';
+use lib '../../lib';
 use base qw(Filmore::ConfiguredObject);
 
 our $VERSION = '0.01';

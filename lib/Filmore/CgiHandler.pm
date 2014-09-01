@@ -7,12 +7,13 @@ use warnings;
 
 package Filmore::CgiHandler;
 
-use lib '../../../lib';
+use lib '../../lib';
 use base qw(Filmore::ConfiguredObject);
 use IO::File;
 
 use Data::Dumper;
 use File::Spec::Functions qw(abs2rel rel2abs splitdir);
+use Filmore::Response;
 
 #----------------------------------------------------------------------
 # Configuration
@@ -39,6 +40,15 @@ $(request)
 </html>
 EOS
 
+use constant RESPONSE_MSG => {
+    200 => 'OK',
+    302 => 'Found',
+    400 => 'Invalid Request',
+    401 => 'Unauthorized',
+    404 => 'File Not Found',
+    500 => 'Script Error',
+};
+
 #----------------------------------------------------------------------
 # Set default values
 
@@ -62,15 +72,20 @@ sub parameters {
 sub run {
     my ($self, %args) = @_;
 
-    my $request = $self->request(%args);
-    my $result = $self->response($request);
-
-    if (! %args) {
-        print "Content-type: $self->{protocol}\n\n";
-        print $result;
+    my ($request, $response);
+    eval {
+        $request = $self->request(%args);
+        $response = $self->response($request);
+    };
+    
+    if ($@) {
+        $response ||= Filmore::Response->new;
+        $response->content($self->error($request, $@));
+        $response->code(200);
     }
 
-    return $result;
+    $self->send_response($response) unless %args;
+    return $response->content || '';
 }
 
 #----------------------------------------------------------------------
@@ -248,8 +263,8 @@ sub request {
 sub response {
     my ($self, $request) = @_;
 
-    my $response;
     my $result;
+    my $response = Filmore::Response->new();
 
     eval {
         # Relocate to base directory, if defined
@@ -261,17 +276,7 @@ sub response {
         }
 
         # Run the procedure with input checking, if provided
-        $response = $self->{form_ptr}->run($request);
-
-        # Extract results
-
-        if ($response->{code} < 300) {
-            $result = $response->{results};
-    	} elsif ($response->{code} < 400) {
-            $self->redirect($request, $response);
-        } else {
-            die $response->{msg};
-        }
+        $response = $self->{form_ptr}->run($request, $response);
     };
 
     # Catch errors and report them
@@ -283,6 +288,35 @@ sub response {
     };
 
     return $result;
+}
+
+#----------------------------------------------------------------------
+# Stringify response and print to stdout
+
+sub send_response {
+    my ($self, $response) = @_;    
+
+    my $code = $response->code;
+    my $response_msg = RESPONSE_MSG;
+    my $msg = $response_msg->{$code};
+
+    print "HTTP/1.0 $code $msg\r\n";
+    print "Content-type: $self->{protocol}\r\n";
+    
+    $response->header('Content_Length', length($self->content)) if $self->content;
+    my $header = $response->header;
+
+    while (@$header) {
+        my $field = shift @$header;
+        my $value = shift @$header;
+        $field = join('-', map {ucfirst $_} split('_', $field));
+        print "$field: $value\r\n";
+    }
+
+    print "\r\n";
+    print $response->content if $response->content;
+    
+    return;
 }
 
 #----------------------------------------------------------------------

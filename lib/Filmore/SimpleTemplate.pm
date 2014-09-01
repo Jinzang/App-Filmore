@@ -3,7 +3,7 @@ use warnings;
 
 package Filmore::SimpleTemplate;
 
-use lib '../../../lib';
+use lib '../../lib';
 use base qw(Filmore::ConfiguredObject);
 use IO::File;
 

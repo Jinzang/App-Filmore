@@ -14,7 +14,7 @@ use File::Copy;
 use Digest::MD5 qw(md5_hex);
 use File::Spec::Functions qw(abs2rel catfile rel2abs splitdir);
 
-use lib '../../../lib';
+use lib '../../lib';
 use base qw(Filmore::ConfiguredObject);
 
 use constant VALID_NAME => qr(^([a-z][\-\w]*\.?\w*)$);
