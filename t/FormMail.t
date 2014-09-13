@@ -163,13 +163,15 @@ do {
 # Build web page
 
 do {
+    
     my $body_tag = $fm->{body_tag};
     my $body = "\n<p>Sein oder nicht sein.</p>\n";
     my $response = {base_url => $base_url,
                     url => $base_url . 'index.html',
                     body => $body};
 
-    my $text = $fm->build_web_page($response);
+    my $page_file = catfile($test_dir, 'index.html');
+    my $text = $fm->build_web_page($page_file, $response);
 
     my $section = $fm->{template_ptr}->parse_sections($text);
     is($section->{$body_tag}, $body, 'Build web page'); # test 5

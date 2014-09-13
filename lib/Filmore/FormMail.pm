@@ -56,12 +56,6 @@ sub build_mail_fields {
 sub build_mail_message {
     my ($self, $response) = @_;
 
-    if ($response->{note}) {
-        $response->{note} = "\n" . $response->{note};
-    } else {
-        $response->{note} = '';
-    }
-
     my $template = $self->{mail_template};
     my $sub = $self->{template_ptr}->construct_code($template);
     my $msg = &$sub($response);
@@ -73,10 +67,8 @@ sub build_mail_message {
 # Build the complete web page from the response body field
 
 sub build_web_page {
-    my ($self, $response) = @_;
+    my ($self, $attachment_name, $response) = @_;
 
-    my $attachment_name =
-        $self->{webfile_ptr}->url_to_filename($response->{url});
     my $text = $self->{webfile_ptr}->reader($attachment_name);
     
     my $section = {$self->{body_tag} => $response->{body}};
@@ -146,12 +138,16 @@ sub info_data {
 sub perform_data {
     my ($self, $response) = @_;
     
+    my $attachment_name =
+        $self->{webfile_ptr}->url_to_filename($response->{url});
+ 
     my $mail_fields = $self->build_mail_fields($response);
 
-    my $attachment = $self->build_web_page($response);
+    my $attachment = $self->build_web_page($attachment_name, $response);
     my $msg = $self->build_mail_message($response);
 
-    $self->{mime_ptr}->send_mail($mail_fields, $msg, $attachment);
+    $self->{mime_ptr}->send_mail($mail_fields, $msg,
+                                 $attachment, $attachment_name);
     return 1;
 }
 
