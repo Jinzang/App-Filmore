@@ -79,6 +79,20 @@ sub create_dirs {
 }
 
 #----------------------------------------------------------------------
+# Convert filename to url
+
+sub filename_to_url {
+    my ($self, $filename, $base_url) = @_;
+    
+    $filename = rel2abs($filename);
+    $filename = abs2rel($filename, $self->{base_directory});
+    $base_url =~ s/\/$//;
+
+    my $url = join('/', $base_url, splitdir($filename));
+    return $url;
+}
+
+#----------------------------------------------------------------------
 # Get file modification time if file exists
 
 sub get_modtime {
@@ -109,7 +123,9 @@ sub get_nonce {
 sub parse_url {
     my ($self, $url) = @_;
 
-    my %parsed_url = (method => 'http:', domain => '', path => '', file => '');    
+    my %parsed_url = (method => 'http:', domain => '', path => '',
+                      file => '', params => '');
+
     my ($method, $rest) = split(m!//!, $url, 2);
 
     unless (defined $rest) {
@@ -120,6 +136,8 @@ sub parse_url {
     
 
     if ($rest) {
+        my ($rest, $params) = split(/\?/, $rest);
+        $parsed_url{params} = $params || '';
         my @path = split(m!/!, $rest);
 
         if (@path) { 

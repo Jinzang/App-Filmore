@@ -102,7 +102,7 @@ do {
 do {
     my $parsed_url = $wf->parse_url('http://www.test.org/script/test.cgi');
     my $parsed_url_ok = {method => 'http:', domain => 'www.test.org',
-                         path => '/script', file => 'test.cgi'};
+                         path => '/script', file => 'test.cgi', params => ''};
 
     is_deeply($parsed_url, $parsed_url_ok, 'Parse complete url'); # test 11
     

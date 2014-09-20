@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl
 use strict;
 
-use Test::More tests => 9;
+use Test::More tests => 4;
 
 use Cwd;
 use File::Path qw(rmtree);
@@ -22,12 +22,14 @@ unshift(@INC, $lib);
 
 require Filmore::CgiHandler;
 
-my $base_dir = catdir(@path, 'test');
-my $subdir = catfile($base_dir, 'sub');
+my $test_dir = catdir(@path, 'test');
+my $base_dir = catdir(@path, 't');
+
+my $subdir = catfile($test_dir, 'sub');
 my $template_dir = $subdir;
 
-rmtree($base_dir);
-mkdir $base_dir;
+rmtree($test_dir);
+mkdir $test_dir;
 
 #----------------------------------------------------------------------
 # Create object
@@ -39,10 +41,7 @@ my %params = (
                 max => 20,
                 protocol => 'text/plain',
                 base_url => $base_url,
-                script_url => "$base_url/script/test.cgi",
-                base_dir => $base_dir,
-                data_dir => "$base_dir/data",
-                script_dir => "$base_dir/script",
+                base_directory => $base_dir,
                 code_ptr => 'MinMax'
              );
 
@@ -52,49 +51,32 @@ isa_ok($o, "Filmore::CgiHandler"); # test 1
 can_ok($o, qw(run)); # test 2
 
 #----------------------------------------------------------------------
-# Test url manipulation
-
-do {
-    my $url = "$base_url/index.html";
-    my $result = $o->terminate_url($url);
-    is($result, $url, 'Terminate url with filename'); # test 3
-    
-    $result = $o->terminate_url($base_url);
-    is($result, "$params{base_url}/", 'Terminate url with no filename'); # test 4
-
-    $url = '/';
-    $result = $o->terminate_url($url);
-    is($result, $url, 'Terminate single slash url'); # test 5
-    
-    $result = $o->base_url($base_url);
-    is($result, "$base_url/", 'Compute base url from directory'); # test 6
-
-    $result = $o->base_url($params{script_url});
-    is($result, "$base_url/script/", 'Compute base url from file'); # test 7
-};
-
-#----------------------------------------------------------------------
 # Process urls
 
 do {
     my $request = {};
-    $request = $o->read_urls($request);
-    my $request_ok = {base_url => "$base_url/",
-                      referer_url => "$base_url/",
-                      script_base_url => "$base_url/script/",
-                      script_url => "$base_url/script/test.cgi",
-                     };
-    is_deeply($request, $request_ok, "Read urls when initialized"); # test 8
+    $request = $o->add_urls($request);
+    my $request_ok = {
+                      base_directory => $base_dir,
+                      base_url => $base_url,
+                      script_directory => $base_dir,
+                      script_url => "$base_url/CgiHandler.t",
+                      };
+
+    is_deeply($request, $request_ok, "Add urls when initialized"); # test 3
 
     $o->{base_url} = '';
+    $o->{script_url} = '';
 
     $request = {};
     my $bare = Filmore::CgiHandler->new();
-    $request = $bare->read_urls($request);
-    $request_ok = {base_url => '/t/',
-                   referer_url => '/t/',
-                   script_base_url => '/t/',
-                   script_url => '/t/CgiHandler.t',
-                  };
-    is_deeply($request, $request_ok, "Read urls when uninitialized"); # test 9
+    $request = $bare->add_urls($request);
+    $request_ok = {
+                    base_directory => '/home/bernie/Code/App-Filmore/t',
+                    base_url => '',
+                    script_directory => '/home/bernie/Code/App-Filmore/t',
+                    script_url => '/t/CgiHandler.t',
+                   };
+
+    is_deeply($request, $request_ok, "Add urls when uninitialized"); # test 4
 };

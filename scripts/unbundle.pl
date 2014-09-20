@@ -46,7 +46,6 @@ sub run {
 
     my $include = get_include();
     my %parameters = set_parameters($include, $request);
-    die "Could not compute base_url\n" unless $parameters{base_url};
 
     my $scripts = copy_site($include, %parameters);
     protect_files($include, $request, $scripts, \%parameters);
@@ -72,17 +71,20 @@ sub run {
 
 sub check_request {
     my ($request) = @_;
+
+    my %missing = (
+                    url => "Please paste url of this page",
+                    user => "Please enter user email and password",
+                    password => "Please enter password",
+                   );
     
-    my $missing_user = "Please enter user email and password";
-    my $missing_password = "Please enter password";
     my $nomatch = "Passwords don't match";
     
-    return $missing_user unless exists $request->{user};
-    return $missing_user unless $request->{user} =~ /\S/;
+    foreach my $field (keys %missing) {
+        return $missing{$field} unless exists $request->{$field}
+                         && $request->{$field} =~ /\S/;
+    }
     
-    return $missing_password unless exists $request->{pass1}
-                             && exists $request->{pass2};
-                             
     return $nomatch unless $request->{pass1} eq $request->{pass2};
     
     return;
@@ -99,17 +101,8 @@ sub command_line {
         my ($name, $value);
         if ($arg =~ /=/) {
             ($name, $value) = split(/=/, $arg, 2);
-
-        } elsif ($arg =~ /\@/) {
-            $name = 'user';
-            $value = $arg;
-
-        } else {
-            $name = exists $request{pass1} ? 'pass2' : 'pass1';
-            $value = $arg;
+            $request{$name} = $value;
         }
-
-        $request{$name} = $value;
     }
 
     $request{pass2} ||= $request{pass1};
@@ -267,6 +260,22 @@ sub encrypt {
 }
 
 #----------------------------------------------------------------------
+# Find the path to the sendmail command
+
+sub find_sendmail {
+    my $path;
+    
+    foreach $path (qw(/usr/lib/sendmail /usr/sbin/sendmail)) {
+        return $path if -e $path;       
+    }
+    
+    $path = `which sendmail`;
+    chomp $path;
+    
+    return $path || '';
+}
+
+#----------------------------------------------------------------------
 # Get the arguments from the command line or interactively
 
 sub get_arguments {
@@ -394,6 +403,42 @@ sub next_file {
     return ($mode, $file, $text);
 }
 
+#----------------------------------------------------------------------
+# Parse a url into its components
+
+sub parse_url {
+    my ($url) = @_;
+
+    my %parsed_url = (method => 'http:', domain => '', path => '',
+                      file => '', params => '');
+
+    my ($method, $rest) = split(m!//!, $url, 2);
+
+    unless (defined $rest) {
+        $rest = $method;
+    } else {
+        $parsed_url{method} = $method;
+    }
+    
+
+    if ($rest) {
+        my ($rest, $params) = split(/\?/, $rest);
+        $parsed_url{params} = $params || '';
+        my @path = split(m!/!, $rest);
+
+        if (@path) { 
+            if ($path[0] =~ /\.(com|org|edu|us)$/) {
+                $parsed_url{domain} = $path[0];
+                $path[0] = '';
+            }
+            
+            $parsed_url{file} = pop(@path) if $path[-1] =~ /\./;
+            $parsed_url{path} = join('/', @path);
+        }
+    }
+    
+    return \%parsed_url;
+}
 #----------------------------------------------------------------------
 # Protect the files with access and password files
 
@@ -556,25 +601,21 @@ sub request_fields {
             {name => 'user', title => 'User Email', show => 1},
             {name => 'pass1', title => 'Password'},
             {name => 'pass2', title => 'Repeat Password'},
-           );    
+            {name => 'url', title => 'Site url', show => 1},
+            );    
 }
 
 #----------------------------------------------------------------------
-# Set the base url from values in environment variables
+# Set the base url from the script url
 
 sub set_base_url {
-    my $base_url = '/';
-
-    if (exists $ENV{SERVER_URI}) {
-        $base_url = $ENV{SERVER_URI};
-        
-    } elsif (exists $ENV{SERVER_NAME}) {
-        $base_url = "http://$ENV{SERVER_NAME}";
-        $base_url .= ":$ENV{SERVER_PORT}" if $ENV{SERVER_PORT} != 80;
-        $base_url .= $ENV{REQUEST_URI};
-    }
+    my ($request) = @_;
     
-    $base_url =~ s/[^\/]+$//;   
+    my $parsed_url = parse_url($request->{url});
+    my @script_path = split('/', $parsed_url->{path});
+    pop(@script_path);
+        
+    my $base_url = join('/', @script_path);
     return $base_url;
 }
 
@@ -601,7 +642,8 @@ sub set_parameters {
     my ($include, $request) = @_;
 
     my $base_directory = getcwd();
-    my $base_url = set_base_url();
+    my $base_url = set_base_url($request);
+    my $sendmail = find_sendmail();
     
     # Set reasonable defaults for parameters
     
@@ -611,7 +653,7 @@ sub set_parameters {
                     base_directory => $base_directory,
                     base_url => $base_url,
                     config_file => "*.cfg",
-                    script_url => '*.cgi',
+                    sendmail_command => $sendmail,
                     site_template => "$include->{templates}/*.htm",
                     valid_read => [$base_directory],
                     web_master => $request->{user},
@@ -669,9 +711,11 @@ div#footer p{padding: 10px;}
 <input name="pass1" value="" size="20" type="password"><br />
 <b>Repeat Password<b><br />
 <input name="pass2" value="" size="20" type="password"><br /><br />
+<b>Paste URL from Address Bar<b><br />
+<input name="url" value="{{url}}" size="60"><br /><br />
 <input type="submit" name="cmd" value="Go">
 </form>
-<div id="footer"><p>The Onsite Editor is free software,
+<div id="footer"><p>This is free software,
 licensed on the same terms as Perl.</p></div>
 </div>    
 </body></html>
@@ -853,4 +897,3 @@ sub write_password_file {
 
     return;
 }
-

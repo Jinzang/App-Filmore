@@ -32,10 +32,10 @@ sub parameters {
   my ($pkg) = @_;
 
     return (
-            base_directory => '',
             nofork => 0,
             port => 8080,
             index_file => 'index.html',
+            webfile_ptr => 'Filmore::WebFile',
 	);
 }
 
@@ -65,6 +65,29 @@ sub run {
     }
     
     return;
+}
+
+#----------------------------------------------------------------------
+# Add urls and directories to request
+
+sub add_urls {
+    my ($self, $request, $url) = @_;
+    
+    my $path = rel2abs($0);
+    my ($directory, $filename) = $self->{webfile_ptr}->split_filename($path);
+
+    $request->{script_directory} = $directory;
+    $request->{base_directory} = $request->{script_directory};
+
+    my $parsed_url = $self->{webfile_ptr}->parse_url($url);
+    $request->{script_url} = $parsed_url->{path};
+
+    my @script_path = split('/', $parsed_url->{path});
+    pop(@script_path);
+        
+    $request->{base_url} = join('/', @script_path);
+    
+    return $request;
 }
 
 #----------------------------------------------------------------------
@@ -153,7 +176,6 @@ sub parse_request {
 
     my $params;  
     if ($method eq 'GET') {
-        $url =~ s/\?([^\?]*)$//;
         $params = $1; 
 
     } elsif ($method eq 'POST') {
@@ -174,9 +196,7 @@ sub parse_request {
         }
     }
 
-    $url =~ s/\#[^\#]*$//;
-    $request->{script_url} = $url;
-
+    $request = $self->add_urls($request, $url);
     return $request;
 }
 
@@ -213,7 +233,7 @@ sub parse_routes {
 sub route_request {
     my ($self, $routes, $request) = @_;
 
-    my ($name, @extra_path) = split(/\//, $request->{script_url});
+    my ($front, $name, @extra_path) = split(/\//, $request->{script_url});
     
     foreach my $route (@$routes) {
         next unless $route->{name} eq $name;
@@ -260,4 +280,5 @@ sub set_request {
 
     return;
 }
+
 1;

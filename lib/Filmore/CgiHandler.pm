@@ -58,7 +58,6 @@ sub parameters {
     return (
             base_directory => '',
             base_url => '',
-            script_url => '',
             detail_errors => 1,
             protocol => 'text/html',
             form_ptr => 'Filmore::FormHandler',
@@ -89,15 +88,30 @@ sub run {
 }
 
 #----------------------------------------------------------------------
-# Extract the base of a url
+# Add urls and directories to request
 
-sub base_url {
-    my ($self, $url) = @_;
+sub add_urls {
+    my ($self, $request) = @_;
+    
+    my $path = rel2abs($0);
+    my ($directory, $filename) = $self->{webfile_ptr}->split_filename($path);
 
-    $url = $self->terminate_url($url);
-    $url =~ s![^/]+$!!;
+    $request->{script_directory} = $directory;
 
-    return $url;
+    $request->{base_directory} = $self->{base_directory} ||
+                                 $request->{script_directory};
+
+    if ($self->{base_url}) {
+        $request->{base_url} = $self->{base_url};
+        $request->{base_url} =~ s/\/$//;
+    } else {
+        $request->{base_url} = '';
+    }
+    
+    $request->{script_url} ||=
+        $self->{webfile_ptr}->filename_to_url($path, $request->{base_url});
+
+    return $request;
 }
 
 #----------------------------------------------------------------------
@@ -136,6 +150,7 @@ sub encode_hash {
 sub error {
     my($self, $request, @errors) = @_;
 
+    # TODO: don't do this!
     $self->{protocol} = 'text/html';
 
     my $template;
@@ -152,56 +167,6 @@ sub error {
 
     my $result = $self->render($template, $data);
     return $result;
-}
-
-#----------------------------------------------------------------------
-# Read selected environment variables into request
-
-sub read_env {
-    my ($self, $request) = @_;
-
-	foreach my $field (qw(path_info remote_user)) {
-		my $ufield = uc($field);
-
-		if (exists $ENV{$ufield}) {
-			$request->{$field} = $ENV{$ufield};
-		} else {
-			delete $request->{$field};
-		}
-	}
-
-	return $request;
-}
-
-#----------------------------------------------------------------------
-# Read urls from environment
-
-sub read_urls {
-    my ($self, $request) = @_;
-
-    if (length $self->{script_url}) {
-        $request->{script_url} = $self->{script_url};
-    } elsif ($ENV{SCRIPT_URI}) {
-        ($request->{script_url}) = split (/\?/, $ENV{SCRIPT_URI});
-    } else {
-        $request->{script_url} = '/' . join('/', splitdir(abs2rel($0)));
-    }
-
-    $request->{script_url} = $self->terminate_url($request->{script_url});
-    $request->{script_base_url} = $self->base_url($request->{script_url});
-
-    if (length $self->{base_url}) {
-        $request->{base_url} = $self->{base_url};
-    } else {
-        $request->{base_url} = $self->base_url($request->{script_url});
-    }
-
-    $request->{base_url} = $self->terminate_url($request->{base_url});
-
-    $request->{referer_url} = $ENV{HTTP_REFERER} || $request->{base_url};
-    $request->{referer_url} = $self->terminate_url($request->{referer_url});
-
-    return $request;
 }
 
 #----------------------------------------------------------------------
@@ -251,8 +216,7 @@ sub request {
     }
 
     my $request = \%request;
-    $request = $self->read_env($request);
-    $request = $self->read_urls($request);
+    $request = $self->add_urls($request);
 
     return $request;
 }
@@ -284,10 +248,12 @@ sub response {
     if ($@) {
         my $error = $@;
         my $coded_request = $self->encode_hash($request);
-        $result = $self->error($coded_request, $error);
+
+        $response->code(200);
+        $response->content($self->error($coded_request, $error));
     };
 
-    return $result;
+    return $response;
 }
 
 #----------------------------------------------------------------------
@@ -336,22 +302,6 @@ sub substitute {
     }
 
     return $value;
-}
-
-#----------------------------------------------------------------------
-# Make sure urls are properly terminated with a slash
-
-sub terminate_url {
-    my ($self, $url) = @_;
-
-    my $parsed_url = $self->{webfile_ptr}->parse_url($url);
-
-    my $new_url = '';
-    $new_url = "$parsed_url->{method}//$parsed_url->{domain}"
-               if $parsed_url->{domain};
-   
-    $new_url .= "$parsed_url->{path}/$parsed_url->{file}";
-    return $new_url;
 }
 
 1;

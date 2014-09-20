@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 #----------------------------------------------------------------------
-# Wrapper for MIME_Mail
+# Prepare a mail message for sending with optional mime attachment
 
 package Filmore::MimeMail;
 
@@ -21,9 +21,9 @@ sub parameters {
     my ($pkg) = @_;
     
     return (
-        method => 'sendmail',
         encoding => '8bit',
         attachment_type => 'text/html',
+        sendmail_ptr => 'Filmore::Sendmail',
     );
 }
 
@@ -133,17 +133,16 @@ sub get_basename {
 sub send_mail {
     my ($self, $mail_fields, $msg, $attachment, $attachment_name) = @_;
 
-    my $mail = IO::File->new("|$self->{sendmail} -oi -t -odq");
-    die "Couldn't run $self->{sendmail}" unless $mail;
+    $self->{sendmail_ptr}->open_mail;
 
     if (defined $attachment) {
-        $self->send_mail_with_attachment($mail, $mail_fields,
-                                         $msg, $attachment, $attachment_name);
+        $self->send_mail_with_attachment($mail_fields, $msg, 
+                                         $attachment, $attachment_name);
     } else {
-        $self->send_mail_no_attachment($mail, $mail_fields, $msg);
+        $self->send_mail_no_attachment($mail_fields, $msg);
     }
 
-    close($mail);
+    $self->{sendmail_ptr}->close_mail;
     return;
 }
 
@@ -151,7 +150,7 @@ sub send_mail {
 # Send a mail message without attachment
 
 sub send_mail_no_attachment {
-    my ($self, $mail, $mail_fields, $msg) = @_;
+    my ($self, $mail_fields, $msg) = @_;
 
     $mail_fields->{mime_version} = '1.0';
     $mail_fields->{content_type} = {
@@ -162,10 +161,10 @@ sub send_mail_no_attachment {
  
     $mail_fields->{content_transfer_encoding} = '8bit';
 
-    print $mail $self->build_header($mail_fields);
-    print $mail $self->encode_as_8bit($msg);
+    $self->{sendmail_ptr}->print_mail($self->build_header($mail_fields));
+    $self->{sendmail_ptr}->print_mail($self->encode_as_8bit($msg));
    
-    close($mail);
+    $self->{sendmail_ptr}->close_mail;
     return;
 
 }
@@ -174,7 +173,7 @@ sub send_mail_no_attachment {
 # Send a mail message with optional attachment
 
 sub send_mail_with_attachment {
-    my ($self, $mail, $mail_fields, $msg, $attachment, $attachment_name) = @_;
+    my ($self, $mail_fields, $msg, $attachment, $attachment_name) = @_;
     
     my $boundary = "------------" . int(time) . $$;
 
@@ -186,8 +185,8 @@ sub send_mail_with_attachment {
                                    };
     $mail_fields->{content_transfer_encoding} = '8bit';
 
-    print $mail $self->build_header($mail_fields);
-    print $mail "This is a multi-part message in MIME format.\n";
+    $self->{sendmail_ptr}->print_mail($self->build_header($mail_fields));
+    $self->{sendmail_ptr}->print_mail("This is a multi-part message in MIME format.\n");
 
     # Print message
     
@@ -200,9 +199,9 @@ sub send_mail_with_attachment {
 
     $msg_header->{content_transfer_encoding} = '8bit';
     
-    print $mail "\n--$boundary\n";
-    print $mail $self->build_headers($msg_header);
-    print $mail $self->encode_as_8bit($msg);
+    $self->{sendmail_ptr}->print_mail("\n--$boundary\n");
+    $self->{sendmail_ptr}->print_mail($self->build_headers($msg_header));
+    $self->{sendmail_ptr}->print_mail($self->encode_as_8bit($msg));
     
     # Encode attachment
     
@@ -235,10 +234,11 @@ sub send_mail_with_attachment {
                                                  filename => "\"$name\"",
                                                 };
     
-    print $mail "\n--$boundary\n";
-    print $mail $self->build_headers($attachment_header);
-    print $mail $attachment;
-    print $mail "\n--$boundary\n";
+    $self->{sendmail_ptr}->print_mail("\n--$boundary\n");
+    $self->{sendmail_ptr}->print_mail($self->build_headers($attachment_header));
+    $self->{sendmail_ptr}->print_mail($attachment);
+    $self->{sendmail_ptr}->print_mail("\n--$boundary\n");
 
+    $self->{sendmail_ptr}->close_mail;
     return;
 }
