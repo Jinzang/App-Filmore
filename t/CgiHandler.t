@@ -57,9 +57,7 @@ do {
     my $request = {};
     $request = $o->add_urls($request);
     my $request_ok = {
-                      base_directory => $base_dir,
                       base_url => $base_url,
-                      script_directory => $base_dir,
                       script_url => "$base_url/CgiHandler.t",
                       };
 
@@ -72,9 +70,7 @@ do {
     my $bare = Filmore::CgiHandler->new();
     $request = $bare->add_urls($request);
     $request_ok = {
-                    base_directory => '/home/bernie/Code/App-Filmore/t',
                     base_url => '',
-                    script_directory => '/home/bernie/Code/App-Filmore/t',
                     script_url => '/t/CgiHandler.t',
                    };
 

@@ -93,14 +93,6 @@ sub run {
 sub add_urls {
     my ($self, $request) = @_;
     
-    my $path = rel2abs($0);
-    my ($directory, $filename) = $self->{webfile_ptr}->split_filename($path);
-
-    $request->{script_directory} = $directory;
-
-    $request->{base_directory} = $self->{base_directory} ||
-                                 $request->{script_directory};
-
     if ($self->{base_url}) {
         $request->{base_url} = $self->{base_url};
         $request->{base_url} =~ s/\/$//;
@@ -108,6 +100,7 @@ sub add_urls {
         $request->{base_url} = '';
     }
     
+    my $path = rel2abs($0);
     $request->{script_url} ||=
         $self->{webfile_ptr}->filename_to_url($path, $request->{base_url});
 

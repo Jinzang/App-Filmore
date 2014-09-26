@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 use strict;
 
-use Test::More tests => 9;
+use Test::More tests => 8;
 
 use IO::File;
 use File::Path qw(rmtree);
@@ -69,17 +69,6 @@ do {
 };
 
 #----------------------------------------------------------------------
-# Test build_url
-
-do {
-    my $base_url = 'http://www.example.com';
-    my $filename = rel2abs('one.html');
-    
-    my $result = $se->build_url($base_url, $test_dir, $filename);
-    is($result, "$base_url/one.html", 'build_url'); # test 2
-};
-
-#----------------------------------------------------------------------
 # Test encode_url
 
 do {
@@ -93,7 +82,7 @@ do {
     $result_ok =~ s/ /+/g;
     $result_ok =~ s/\"/%22/g;
     
-    is($result, $result_ok, 'encode_url'); # test 3
+    is($result, $result_ok, 'encode_url'); # test 2
 };
 
 #----------------------------------------------------------------------
@@ -111,7 +100,7 @@ do {
     $result_ok =~ s/\s+$//;
     
     my $result = $se->get_context($text, 'dd', 80);
-    is($result, $result_ok, 'get_context');  #test 4  
+    is($result, $result_ok, 'get_context');  #test 3 
 };
 
 #----------------------------------------------------------------------
@@ -148,8 +137,8 @@ EOQ
 EOQ
 
     my ($title, $body) = $se->parse_htmldoc($text);
-    is($title, 'My Title', 'parse_htmldoc title'); # test 5
-    is($body, "\nMy content.\n", 'parse_htmldoc body'); # test 6
+    is($title, 'My Title', 'parse_htmldoc title'); # test 4
+    is($body, "\nMy content.\n", 'parse_htmldoc body'); # test 5
 };
 
 #----------------------------------------------------------------------
@@ -157,7 +146,7 @@ EOQ
 
 do {
     my $base_url = 'http://www.example.com';
-    my $result = $se->do_search($base_url, $test_dir, 'first');
+    my $result = $se->do_search($base_url, 'first');
 
     delete $result->[0]{modtime};
     my $result_ok = [{title => 'Page First',
@@ -165,7 +154,7 @@ do {
                       context => 'This is the <b>first</b> page. It is not the fourth page.',
                       url => "$base_url/first.html"}];
 
-    is_deeply($result, $result_ok, 'do_search'); # test 7  
+    is_deeply($result, $result_ok, 'do_search'); # test 6  
 };
 
 #----------------------------------------------------------------------
@@ -188,9 +177,9 @@ do {
     my %restricted_ok = (%$hash, total => 100, start => 1, finish => 20);
     $restricted_ok{results} = \@subset;
 
-    is_deeply($restricted, \%restricted_ok, 'restrict_page'); # test 8
+    is_deeply($restricted, \%restricted_ok, 'restrict_page'); # test 7
 
     $restricted = $se->navlinks($restricted);
     is($restricted->{next_url}, "$url?query=$query&start=21",
-       'navlinks next'); # test 9
+       'navlinks next'); # test 8
 };

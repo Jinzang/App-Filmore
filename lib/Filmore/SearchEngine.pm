@@ -37,29 +37,18 @@ sub parameters {
 }
 
 #----------------------------------------------------------------------
-# Build the page url from the base url and filname
-
-sub build_url {
-    my ($self, $base_url, $base_directory, $filename) = @_;
-
-    $filename = abs2rel($filename, $base_directory);
-    my @path = splitdir($filename);
-
-    return return join('/', $base_url, @path);
-}
-
-#----------------------------------------------------------------------
 # Do the search and build the output array
 
 sub do_search {
-    my ($self, $base_url, $base_directory, @term) = @_;
+    my ($self, $base_url, @term) = @_;
 
     # Create the closure used to search the files
 
     my $results = [];
     my $do_pattern = $self->globbify($self->{do_search});
     my $dont_pattern = $self->globbify($self->{dont_search});
-
+    my $base_directory = getcwd();
+    
     if (@term) {
         my $visit = $self->{webfile_ptr}->visitor($base_directory, '-date');
         while (defined (my $filename = &$visit)) {
@@ -93,8 +82,8 @@ sub do_search {
             my $modtime = (stat $filename)[9];
             my $result = {title => $title, count => $count, modtime => $modtime};
         
-            $result->{url} = 
-              $self->build_url($base_url, $base_directory, $filename);
+            $result->{url} =
+                $self->{webfile_ptr}->filename_to_url($filename, $base_url);
         
             $result->{context} = $self->get_context($body, $term[0], $pos[0]),;
         
@@ -327,14 +316,13 @@ sub write_data {
 
     # Set configuration variables if left empty
     
-    my $base_directory = $response->{base_directory} || getcwd();
     my $base_url = $response->{base_url} || '';
     $base_url =~ s!/[^/]*$!!;
     
     # Perform the search and put results into an array
     
     my @term = map ('\b'.quotemeta($_).'\b', shellwords ($response->{query}));
-    my $results = $self->do_search($base_url, $base_directory, @term);
+    my $results = $self->do_search($base_url, @term);
     
     # Build navigation links 
     
