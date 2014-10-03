@@ -37,16 +37,25 @@ sub content {
 sub header {
     my ($self, $field, $value) = @_;
     
-    $self->{header} ||= [];
+    $self->{header} ||= []; 
     return $self->{header} unless defined $field;
 
     if (defined $value) {
-        push(@{$self->{header}}, $field, $value);
+        my $found;
+        for (my $i = 0; $i < @{$self->{header}}; $i += 2) {
+            if ($self->{header}[$i] eq $field) {
+                $self->{header}[$i+1] = $value;
+                $found = 1;
+                last;
+            }
+        }
+
+        push(@{$self->{header}}, $field, $value) unless $found;
 
     } else {
         for (my $i = 0; $i < @{$self->{header}}; $i += 2) {
             if ($self->{header}{$i} eq $field) {
-                $value = $self->{header}{$i+1};
+                $value = $self->{header}[$i+1];
                 last;
             }
         }
