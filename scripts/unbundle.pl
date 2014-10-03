@@ -688,7 +688,7 @@ sub show_form {
     
     my $template = <<'EOS';
 <head>
-<title>Onsite Editor</title>
+<title>Filmore</title>
 <style>
 div#header {background: #5f9ea0;color: #fff;}
 div#header h1{margin: 0; padding: 10px;}
@@ -697,7 +697,7 @@ div#footer p{padding: 10px;}
 </style>
 </head>
 <body>
-<h1 id="banner">Onsite Editor</h1>
+<h1 id="banner">Filmore</h1>
 <p>{{error}}</p>
 
 <!--
