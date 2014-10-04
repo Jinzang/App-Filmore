@@ -311,7 +311,7 @@ EOQ
 #----------------------------------------------------------------------
 # Run the handler
 
-sub write_data {
+sub use_data {
     my ($self, $response) = @_;
 
     # Set configuration variables if left empty

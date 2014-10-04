@@ -49,7 +49,7 @@ sub run {
             if (lc($results->{cmd}) eq 'cancel') {
                 $redirect = 1;
             } elsif ($self->validate_items($results)) {
-                $redirect = $self->perform_data($results);
+                $redirect = $self->use_data($results);
             } 
 
         } else {
@@ -227,20 +227,6 @@ sub parse_validator {
 }
 
 #----------------------------------------------------------------------
-# Call method to perform action on data
-
-sub perform_data {
-    my ($self, $results) = @_;
-    
-    my $redirect;
-    if ($self->{code_ptr}->can('perform_data')) {
-        $redirect = $self->{code_ptr}->perform_data($results);
-    }
-    
-    return $redirect;
-}
-
-#----------------------------------------------------------------------
 # Read the file and extract the content, put into results body field
 
 sub populate_items {
@@ -323,6 +309,20 @@ sub update_result_items {
     }
    
     return;
+}
+
+#----------------------------------------------------------------------
+# Call method to use data gathered from form
+
+sub use_data {
+    my ($self, $results) = @_;
+    
+    my $redirect;
+    if ($self->{code_ptr}->can('use_data')) {
+        $redirect = $self->{code_ptr}->use_data($results);
+    }
+    
+    return $redirect;
 }
 
 #----------------------------------------------------------------------

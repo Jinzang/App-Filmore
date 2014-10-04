@@ -41,7 +41,7 @@ sub info_data {
 #----------------------------------------------------------------------
 # Run the handler
 
-sub perform_data {
+sub use_data {
     my ($self, $response) = @_;
 
     $response->{msg} = "Value in bounds";
