@@ -39,16 +39,6 @@ sub info_data {
 }
 
 #----------------------------------------------------------------------
-# Run the handler
-
-sub use_data {
-    my ($self, $response) = @_;
-
-    $response->{msg} = "Value in bounds";
-    return;
-}
-
-#----------------------------------------------------------------------
 # Read data associated with a form
 
 sub read_data {
@@ -78,6 +68,16 @@ sub template_data {
 </body>
 </html>
 EOQ
+}
+
+#----------------------------------------------------------------------
+# Run the handler
+
+sub use_data {
+    my ($self, $response) = @_;
+
+    $response->{msg} = "Value in bounds";
+    return;
 }
 
 #----------------------------------------------------------------------
