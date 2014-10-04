@@ -54,7 +54,7 @@ sub header {
 
     } else {
         for (my $i = 0; $i < @{$self->{header}}; $i += 2) {
-            if ($self->{header}{$i} eq $field) {
+            if ($self->{header}[$i] eq $field) {
                 $value = $self->{header}[$i+1];
                 last;
             }
