@@ -172,7 +172,7 @@ sub globbify {
 #----------------------------------------------------------------------
 # Return info about form parameters
 
-sub info_data {
+sub info_object {
     my ($self, $response) = @_;
 
     my $info = [{name => 'query',
@@ -256,7 +256,7 @@ sub restrict_page {
 #----------------------------------------------------------------------
 # Return the template used to render the result
 
-sub template_data {
+sub template_object {
     my ($self, $response) = @_;
 
     return <<'EOQ';
@@ -311,7 +311,7 @@ EOQ
 #----------------------------------------------------------------------
 # Run the handler
 
-sub use_data {
+sub use_object {
     my ($self, $response) = @_;
 
     # Set configuration variables if left empty

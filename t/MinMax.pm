@@ -27,7 +27,7 @@ sub parameters {
 #----------------------------------------------------------------------
 # Return info about form parameters
 
-sub info_data {
+sub info_object {
     my ($self, $response) = @_;
 
     my %info = (name => 'value',
@@ -41,7 +41,7 @@ sub info_data {
 #----------------------------------------------------------------------
 # Read data associated with a form
 
-sub read_data {
+sub read_object {
     my ($self, $response) = @_;
     
     $response->{msg} = "Please enter a value";
@@ -51,7 +51,7 @@ sub read_data {
 #----------------------------------------------------------------------
 # Return the template used to render the result
 
-sub template_data {
+sub template_object {
     my ($self, $response) = @_;
 
     return <<'EOQ';
@@ -73,7 +73,7 @@ EOQ
 #----------------------------------------------------------------------
 # Run the handler
 
-sub use_data {
+sub use_object {
     my ($self, $response) = @_;
 
     $response->{msg} = "Value in bounds";
@@ -83,7 +83,7 @@ sub use_data {
 #----------------------------------------------------------------------
 # Validate the data in the response
 
-sub validate_data {
+sub validate_object {
     my ($self, $response) = @_;
     return;
 }
