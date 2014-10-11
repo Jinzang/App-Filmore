@@ -40,7 +40,7 @@ sub run {
     my $results = {};
     %$results = %$request;
 
-    $results->{items} = $self->{code_ptr}->info_data($results);
+    $results->{items} = $self->{code_ptr}->info_object($results);
     $self->update_result_items($results, $request);
 
     my $redirect;
@@ -49,11 +49,11 @@ sub run {
             if (lc($results->{cmd}) eq 'cancel') {
                 $redirect = 1;
             } elsif ($self->validate_items($results)) {
-                $redirect = $self->use_data($results);
+                $redirect = $self->use_object($results);
             } 
 
         } else {
-            $self->read_data($results);        
+            $self->read_object($results);        
             $self->update_result_items($results);
         }
     };
@@ -154,7 +154,7 @@ sub build_form {
 
     my @templates;   
     push(@templates, $self->{site_template}) if $self->{site_template};
-    push(@templates, $self->template_data($results));
+    push(@templates, $self->template_object($results));
 
     # Generate page
 
@@ -183,12 +183,12 @@ sub build_form_fields {
 #----------------------------------------------------------------------
 # Get the info about the fields to be displayed in the form
 
-sub info_data {
+sub info_object {
     my ($self, $results) = @_;
     
     my $info;
-    if ($self->{code_ptr}->can('info_data')) {
-        $info = $self->{code_ptr}->info_data($results);
+    if ($self->{code_ptr}->can('info_object')) {
+        $info = $self->{code_ptr}->info_object($results);
     } else {
         die "No info about form fields";
     }
@@ -253,11 +253,11 @@ sub populate_items {
 #----------------------------------------------------------------------
 # Read the data to be displayed in the form
 
-sub read_data {
+sub read_object {
     my ($self, $results) = @_;
     
-    if ($self->{code_ptr}->can('read_data')) {
-        $self->{code_ptr}->read_data($results);
+    if ($self->{code_ptr}->can('read_object')) {
+        $self->{code_ptr}->read_object($results);
     }
     
     return;
@@ -266,12 +266,12 @@ sub read_data {
 #----------------------------------------------------------------------
 # Get the subtemplate used to render the file
 
-sub template_data {
+sub template_object {
     my ($self, $results) = @_;
     
     my $subtemplate;
-    if ($self->{code_ptr}->can('template_data')) {
-        $subtemplate = $self->{code_ptr}->template_data($results);
+    if ($self->{code_ptr}->can('template_object')) {
+        $subtemplate = $self->{code_ptr}->template_object($results);
     } else {
         die "No template data";
     }
@@ -314,12 +314,12 @@ sub update_result_items {
 #----------------------------------------------------------------------
 # Call method to use data gathered from form
 
-sub use_data {
+sub use_object {
     my ($self, $results) = @_;
     
     my $redirect;
-    if ($self->{code_ptr}->can('use_data')) {
-        $redirect = $self->{code_ptr}->use_data($results);
+    if ($self->{code_ptr}->can('use_object')) {
+        $redirect = $self->{code_ptr}->use_object($results);
     }
     
     return $redirect;
@@ -512,12 +512,12 @@ sub validate {
 #----------------------------------------------------------------------
 # Call method to validate results if it is present
 
-sub validate_data {
+sub validate_object {
     my ($self, $results) = @_;
     
     my $msg;
-    if ($self->{code_ptr}->can('validate_data')) {
-        $msg = $self->{code_ptr}->validate_data($results);
+    if ($self->{code_ptr}->can('validate_object')) {
+        $msg = $self->{code_ptr}->validate_object($results);
     }
     
     return $msg;
@@ -544,7 +544,7 @@ sub validate_items {
         push(@message, $msg) if $msg;
     }
 
-    my $msg = $self->validate_data($results);
+    my $msg = $self->validate_object($results);
     push(@message, $msg) if $msg;
     
     $results->{msg} = join("<br>\n", @message) if @message;
