@@ -17,7 +17,7 @@ pop(@path);
 my $lib = catdir(@path, 'lib');
 unshift(@INC, $lib);
 
-require Filmore::FormMail;
+require Filmore::MailPage;
 
 my $test_dir = catdir(@path, 'test');
 my $template_dir = catdir(@path, 'test', 'templates');
@@ -33,7 +33,7 @@ my %params = (
               web_master => 'busy@body.com',
               );
 
-my $fm = Filmore::FormMail->new(%params);
+my $mp = Filmore::MailPage->new(%params);
 my $wf = Filmore::WebFile->new(%params);
 
 #----------------------------------------------------------------------
@@ -50,6 +50,13 @@ type = textarea
 [body]
 valid = &
 type = textarea
+EOQ
+
+my $mail = <<'EOQ';
+template = Edited version of $url was submitted by $email
+
+$note
+subject = Edited web page
 EOQ
 
 my $form = <<'EOQ';
@@ -98,10 +105,13 @@ my $page = <<'EOQ';
 </html>
 EOQ
 
-my $info_file = catfile($template_dir, 'FormMail.info');
+my $info_file = catfile($template_dir, 'MailPage.info');
 $wf->write_wo_validation($info_file, $info);
 
-my $form_file = catfile($template_dir, 'FormMail.htm');
+my $mail_file = catfile($template_dir, 'MailPage.mail');
+$wf->write_wo_validation($mail_file, $mail);
+
+my $form_file = catfile($template_dir, 'MailPage.htm');
 $wf->write_wo_validation($form_file, $form);
 
 my $page_file = catfile($test_dir, 'index.html');
@@ -111,8 +121,8 @@ $wf->write_wo_validation($page_file, $page);
 # Test generating template filename
 
 do {
-    my $filename_ok = catfile($template_dir, 'FormMail.foo');
-    my $filename = $fm->template_filename('foo');
+    my $filename_ok = catfile($template_dir, 'MailPage.foo');
+    my $filename = $mp->template_filename('foo');
     is($filename, $filename_ok, 'Generate filename'); # test 1
 };
 
@@ -128,7 +138,7 @@ do {
                    ];
 
     my $response = {};
-    my $info = $fm->info_data($response);
+    my $info = $mp->info_object($response);
     is_deeply($info, $info_ok, 'Read info file'); # test 2
 };
 
@@ -144,7 +154,7 @@ do {
 EOQ
     chomp $body_ok;
     my $response = {base_url => $base_url, url => $base_url . 'index.html'};
-    $fm->read_data($response);
+    $mp->read_object($response);
     
     is($response->{body}, $body_ok, 'Read page contents'); # test 3
 };
@@ -154,7 +164,7 @@ EOQ
 
 do {
     my $response = {base_url => $base_url, url => $base_url . 'index.html'};
-    my $text = $fm->template_data($response);
+    my $text = $mp->template_object($response, 'htm');
     
     is($text, $form, 'Read template'); # test 4
 };
@@ -163,16 +173,16 @@ do {
 # Build web page
 
 do {
-    my $body_tag = $fm->{body_tag};
+    my $body_tag = $mp->{body_tag};
     
     my $body = "\n<p>Sein oder nicht sein.</p>\n";
     my $response = {base_url => $base_url,
                     url => $base_url . 'index.html',
                     body => $body};
 
-    my $text = $fm->build_web_page($page_file, $response);
+    my $text = $mp->build_web_page($page_file, $response);
 
-    my $section = $fm->{template_ptr}->parse_sections($text);
+    my $section = $mp->{template_ptr}->parse_sections($text);
     is($section->{$body_tag}, $body, 'Build web page'); # test 5
 };
 
@@ -184,15 +194,19 @@ do {
 
     my $response = {url => $base_url . 'index.html',
                     email => $email,
+                    note => '',
                     };
 
+    my $body = "Edited version of $response->{url} was submitted by $response->{email}\n\n\n";
+    
     my $mail_ok = {
                    from => $email,
                    to => $params{web_master},
                    subject => 'Edited web page',
+                   body => $body,
                    };
     
-    my $mail = $fm->build_mail_fields($response);
+    my $mail = $mp->build_mail_fields($response);
     is_deeply($mail, $mail_ok, 'Build mail fields'); # test 6
 };
 

@@ -35,6 +35,8 @@ sub build_header {
 
     my @headers;
     for my $field (reverse sort keys %$mail_fields) {
+        next if $mail_fields->{body};
+        
         my $value = $mail_fields->{$field};
         next unless $value;
 
@@ -131,15 +133,15 @@ sub get_basename {
 # Send a mail message with optional attachment
 
 sub send_mail {
-    my ($self, $mail_fields, $msg, $attachment, $attachment_name) = @_;
+    my ($self, $mail_fields, $attachment, $attachment_name) = @_;
 
     $self->{sendmail_ptr}->open_mail;
 
     if (defined $attachment) {
-        $self->send_mail_with_attachment($mail_fields, $msg, 
-                                         $attachment, $attachment_name);
+        $self->send_mail_with_attachment($mail_fields, $attachment,
+                                         $attachment_name);
     } else {
-        $self->send_mail_no_attachment($mail_fields, $msg);
+        $self->send_mail_no_attachment($mail_fields);
     }
 
     $self->{sendmail_ptr}->close_mail;
@@ -150,7 +152,7 @@ sub send_mail {
 # Send a mail message without attachment
 
 sub send_mail_no_attachment {
-    my ($self, $mail_fields, $msg) = @_;
+    my ($self, $mail_fields) = @_;
 
     $mail_fields->{mime_version} = '1.0';
     $mail_fields->{content_type} = {
@@ -162,7 +164,8 @@ sub send_mail_no_attachment {
     $mail_fields->{content_transfer_encoding} = '8bit';
 
     $self->{sendmail_ptr}->print_mail($self->build_header($mail_fields));
-    $self->{sendmail_ptr}->print_mail($self->encode_as_8bit($msg));
+    my $msg = $self->encode_as_8bit($mail_fields->{body});
+    $self->{sendmail_ptr}->print_mail($msg);
    
     $self->{sendmail_ptr}->close_mail;
     return;
@@ -173,7 +176,7 @@ sub send_mail_no_attachment {
 # Send a mail message with optional attachment
 
 sub send_mail_with_attachment {
-    my ($self, $mail_fields, $msg, $attachment, $attachment_name) = @_;
+    my ($self, $mail_fields, $attachment, $attachment_name) = @_;
     
     my $boundary = "------------" . int(time) . $$;
 
@@ -201,6 +204,8 @@ sub send_mail_with_attachment {
     
     $self->{sendmail_ptr}->print_mail("\n--$boundary\n");
     $self->{sendmail_ptr}->print_mail($self->build_headers($msg_header));
+
+    my $msg = $self->encode_as_8bit($mail_fields->{body});
     $self->{sendmail_ptr}->print_mail($self->encode_as_8bit($msg));
     
     # Encode attachment

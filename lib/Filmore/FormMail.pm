@@ -11,12 +11,6 @@ our $VERSION = '0.01';
 use Cwd;
 use File::Spec::Functions qw(abs2rel catfile rel2abs splitdir);
 
-use constant DEFAULT_MAIL_TEMPLATE => <<'EOQ';
-Edited version of $url was submitted by $email
-
-$note
-EOQ
-
 #----------------------------------------------------------------------
 # Set the default parameter values
 
@@ -26,10 +20,10 @@ sub parameters {
     return (
         web_master => '',
         info_extension => 'info',
+        mail_extension => 'mail',
         template_extension => 'htm',
         body_tag => 'content',
         template_directory => 'templates',
-        mail_template => DEFAULT_MAIL_TEMPLATE,
         template_ptr => 'Filmore::SimpleTemplate',
         webfile_ptr => 'Filmore::WebFile',
         mime_ptr => 'Filmore::MimeMail',
@@ -42,47 +36,37 @@ sub parameters {
 sub build_mail_fields {
     my ($self, $response) = @_;
 
-    my %mail_fields;
-    $mail_fields{to} = $self->{web_master};
-    $mail_fields{from} = $response->{email};
-    $mail_fields{subject} = 'Edited web page';
+    my $text = $self->template_object($response, $self->{mail_extension});
+    my $mail_fields = $self->parse_info($text);
 
-    return \%mail_fields;
-}
+    $mail_fields->{to} ||= $self->{web_master};
+    $mail_fields->{from} ||= $response->{email};
+    $mail_fields->{subject} ||= 'Message';
 
-#----------------------------------------------------------------------
-# Build the body of the mail message
+    my $sub = $self->{template_ptr}->construct_code($mail_fields->{template});
+    $mail_fields->{body} = &$sub($response);
 
-sub build_mail_message {
-    my ($self, $response) = @_;
-
-    my $template = $self->{mail_template};
-    my $sub = $self->{template_ptr}->construct_code($template);
-    my $msg = &$sub($response);
-
-    return $msg;
-}
-
-#----------------------------------------------------------------------
-# Build the complete web page from the response body field
-
-sub build_web_page {
-    my ($self, $attachment_name, $response) = @_;
-
-    my $text = $self->{webfile_ptr}->reader($attachment_name);
-    
-    my $section = {$self->{body_tag} => $response->{body}};
-    return $self->{template_ptr}->substitute_sections($text, $section);
+    delete $mail_fields->{template};
+    return $mail_fields;
 }
 
 #----------------------------------------------------------------------
 # Return info about form parameters
 
-sub info_data {
+sub info_object {
     my ($self, $response) = @_;
 
-    my $filename = $self->template_filename($self->{info_extension});
-    my $text = $self->{webfile_ptr}->reader($filename);    
+    my $text = $self->template_object($response, $self->{info_extension});
+    my $info = $self->parse_info($text, 1);
+    return $info;
+}
+
+#----------------------------------------------------------------------
+# Return info about form parameters
+
+sub parse_info {
+    my ($self, $text, $id_tags) = @_;
+
     my @lines = split(/\n/, $text);
     
     my @info;
@@ -96,6 +80,8 @@ sub info_data {
             undef $field;
             
         } elsif (/^\s*\[([^\]]*)\]/) {
+            die "Id is not allowed: $1" unless $id_tags;
+            
             push(@info, $item) if %$item;
             $item = {};
             
@@ -128,33 +114,21 @@ sub info_data {
         }
     }
 
-    push(@info, $item) if %$item;
-    return \@info;
+    if ($id_tags) {
+        push(@info, $item) if %$item;
+        return \@info;
+    } else {
+        return $item;
+    }
 }
 
 #----------------------------------------------------------------------
-# Read data from file into form
+# Return the template used to render the mail message
 
-sub read_data {
-    my ($self, $response) = @_;
+sub template_object {
+    my ($self, $response, $ext) = @_;
 
-    my $filename = $self->{webfile_ptr}->url_to_filename($response->{url});
-    my $text = $self->{webfile_ptr}->reader($filename);
-    die "Couldn't read filename: $filename" unless $text;
-    
-    my $section = $self->{template_ptr}->parse_sections($text);
-    $response->{body} = $section->{$self->{body_tag}};
-    
-    return;
-}
-
-#----------------------------------------------------------------------
-# Return the template used to render the result
-
-sub template_data {
-    my ($self, $response) = @_;
-
-    my $filename = $self->template_filename($self->{template_extension});
+    my $filename = $self->template_filename($ext);
     my $text = $self->{webfile_ptr}->reader($filename);
     die "Couldn't read template" unless length $text;
     
@@ -179,19 +153,12 @@ sub template_filename {
 #----------------------------------------------------------------------
 # Send mail message when request is correct
 
-sub use_data {
+sub use_object {
     my ($self, $response) = @_;
     
-    my $attachment_name =
-        $self->{webfile_ptr}->url_to_filename($response->{url});
- 
     my $mail_fields = $self->build_mail_fields($response);
-
-    my $attachment = $self->build_web_page($attachment_name, $response);
-    my $msg = $self->build_mail_message($response);
-
-    $self->{mime_ptr}->send_mail($mail_fields, $msg,
-                                 $attachment, $attachment_name);
+    $self->{mime_ptr}->send_mail($mail_fields);
+    
     return 1;
 }
 
