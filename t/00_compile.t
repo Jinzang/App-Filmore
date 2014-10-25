@@ -16,8 +16,12 @@ use_ok $_ for qw(
     Filmore::ConfiguredObject
     Filmore::FormHandler
     Filmore::FormMail
+    Filmore::HttpHandler
+    Filmore::MailPage
+    Filmore::MimeMail
     Filmore::Response
     Filmore::SearchEngine
+    Filmore::Sendmail
     Filmore::SimpleTemplate
     Filmore::WebFile
 );
