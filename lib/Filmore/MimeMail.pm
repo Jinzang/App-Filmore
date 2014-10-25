@@ -35,26 +35,28 @@ sub build_header {
 
     my @headers;
     for my $field (reverse sort keys %$mail_fields) {
-        next if $mail_fields->{body};
+        next if $field eq 'body';
         
         my $value = $mail_fields->{$field};
         next unless $value;
 
         my $str = '';
+        $field = $self->get_fieldname($field);
+        
         if (ref $value) {
             my @subfields;
             for my $subfield (sort keys %$value) {
+                my $subvalue = $value->{$subfield};
+
                 if (length $subfield) {
-                    push(@subfields, "$subfield=$value->{$subfield}");
+                    push(@subfields, "$subfield=$subvalue");
                 } else {
-                    push(@subfields, $value);
+                    push(@subfields, $subvalue);
                 }
-                $str = join('; ', @subfields) . ';';
             }
-            
+            $str = join('; ', @subfields) . ';';
+           
         } else {
-            $field =~ s/\b([a-z])/uc($1)/ge;
-            $field =~ s/^mime-/MIME-/ig;
             $str = $value;
         }
         
@@ -120,13 +122,26 @@ sub encode_as_qp {
 # Extract base name from attachment name
 
 sub get_basename {
-    my ($attachment_name) = @_;
+    my ($self, $attachment_name) = @_;
     return '' unless defined $attachment_name;
     
     my @path = splitdir($attachment_name);
     my $name = pop(@path);
     
     return $name =~ /\./ ? $name : '';
+}
+
+#----------------------------------------------------------------------
+# Convert field name to proper format
+
+sub get_fieldname {
+    my ($self, $field) = @_;
+ 
+    $field =~ s/_/-/g;   
+    $field =~ s/\b([a-z])/uc($1)/ge;
+    $field =~ s/^mime-/MIME-/ig;
+
+    return $field;
 }
 
 #----------------------------------------------------------------------
@@ -162,18 +177,17 @@ sub send_mail_no_attachment {
                                     };
  
     $mail_fields->{content_transfer_encoding} = '8bit';
+    my $msg = $self->encode_as_8bit($mail_fields->{body});
 
     $self->{sendmail_ptr}->print_mail($self->build_header($mail_fields));
-    my $msg = $self->encode_as_8bit($mail_fields->{body});
-    $self->{sendmail_ptr}->print_mail($msg);
-   
+    $self->{sendmail_ptr}->print_mail($msg);   
     $self->{sendmail_ptr}->close_mail;
-    return;
 
+    return;
 }
 
 #----------------------------------------------------------------------
-# Send a mail message with optional attachment
+# Send a mail message with an attachment
 
 sub send_mail_with_attachment {
     my ($self, $mail_fields, $attachment, $attachment_name) = @_;
@@ -203,7 +217,7 @@ sub send_mail_with_attachment {
     $msg_header->{content_transfer_encoding} = '8bit';
     
     $self->{sendmail_ptr}->print_mail("\n--$boundary\n");
-    $self->{sendmail_ptr}->print_mail($self->build_headers($msg_header));
+    $self->{sendmail_ptr}->print_mail($self->build_header($msg_header));
 
     my $msg = $self->encode_as_8bit($mail_fields->{body});
     $self->{sendmail_ptr}->print_mail($self->encode_as_8bit($msg));
@@ -240,10 +254,12 @@ sub send_mail_with_attachment {
                                                 };
     
     $self->{sendmail_ptr}->print_mail("\n--$boundary\n");
-    $self->{sendmail_ptr}->print_mail($self->build_headers($attachment_header));
+    $self->{sendmail_ptr}->print_mail($self->build_header($attachment_header));
     $self->{sendmail_ptr}->print_mail($attachment);
     $self->{sendmail_ptr}->print_mail("\n--$boundary\n");
 
     $self->{sendmail_ptr}->close_mail;
     return;
 }
+
+1;
