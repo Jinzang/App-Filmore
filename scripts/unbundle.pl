@@ -535,7 +535,7 @@ sub read_groups_file {
 # Read the current password file into a hash
 
 sub read_password_file {
-    my ($file, $scripts) = @_;    
+    my ($file) = @_;    
 
     my $fd;
     my %passwords;
@@ -553,7 +553,7 @@ sub read_password_file {
         close $fd;
     }
     
-    return $scripts;
+    return \%passwords;
  }
 
 #----------------------------------------------------------------------
@@ -839,7 +839,7 @@ sub write_group_file {
         next if $scripts->{$basename}{public};
         $scripts->{$basename}{users}{$user} = 1;
  
-        my $user_list = join(' ', sort keys $scripts->{$basename}{users});
+        my $user_list = join(' ', sort keys %{$scripts->{$basename}{users}});
         print $fd "$basename: $user_list\n";
     }
 
