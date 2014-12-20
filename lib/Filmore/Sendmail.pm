@@ -32,7 +32,7 @@ sub parameters {
 sub close_mail {
     my ($self) = @_;
 
-    close $fd;
+    close $fd if $fd;
     undef $fd;
     
     return;
