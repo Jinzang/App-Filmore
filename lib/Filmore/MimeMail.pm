@@ -181,7 +181,6 @@ sub send_mail_no_attachment {
 
     $self->{sendmail_ptr}->print_mail($self->build_header($mail_fields));
     $self->{sendmail_ptr}->print_mail($msg);   
-    $self->{sendmail_ptr}->close_mail;
 
     return;
 }
@@ -258,7 +257,6 @@ sub send_mail_with_attachment {
     $self->{sendmail_ptr}->print_mail($attachment);
     $self->{sendmail_ptr}->print_mail("\n--$boundary\n");
 
-    $self->{sendmail_ptr}->close_mail;
     return;
 }
 
