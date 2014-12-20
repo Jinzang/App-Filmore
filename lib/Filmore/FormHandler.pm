@@ -21,7 +21,7 @@ use Filmore::Response;
 
 sub parameters {
     my ($pkg) = @_;
-    
+
     return (
         site_template => '',
         body_tag => 'content',
@@ -40,6 +40,7 @@ sub run {
     my $results = {};
     %$results = %$request;
 
+    $results->{url} = $request->{script_url};
     $results->{items} = $self->{code_ptr}->info_object($results);
     $self->update_result_items($results, $request);
 
@@ -50,17 +51,17 @@ sub run {
                 $redirect = 1;
             } elsif ($self->validate_items($results)) {
                 $redirect = $self->use_object($results);
-            } 
+            }
 
         } else {
-            $self->read_object($results);        
+            $self->read_object($results);
             $self->update_result_items($results);
         }
     };
 
     $response = Filmore::Response->new() unless $response;
     $results->{msg} = $@ if $@;
-    
+
     # Redirect back to edited page if flag is set
     # otherwise generate the form
 
@@ -85,20 +86,23 @@ sub build_field {
     my $args = {};
 
     # Set default item type and style
-    
+
     $item->{style} = '' unless exists $item->{style};
-    $item->{type} = 'text' unless exists $item->{type};
+    $args->{"-name"} = $item->{name};
 
     if (exists $item->{selection}) {
-        $item->{type} = 'popup';
+        $item->{type} ||= 'popup';
         my @selections = split(/\|/, $item->{selection});
         $args->{"-values"} = \@selections;
+        $args->{"-default"} = $item->{value};
+
+    } else {
+        $item->{type} ||= 'text';
+        $args->{"-value"} = $item->{value};
     }
 
     # Set arguments passed to subfoutine that generates form field
-    
-    $args->{"-value"} = $item->{value};
-    $args->{"-name"} = $item->{name};
+
 
     my @pairs = split(/;/, $item->{style});
     foreach my $pair (@pairs) {
@@ -129,10 +133,13 @@ sub build_field {
          $field = hidden(%$args);
     } elsif ($item->{type} eq 'popup') {
         $args->{"-default"} ||= $args->{"-value"};
-        $field = popup_menu($args->{-name}, $args->{-values}, $args->{-value});
+        $field = popup_menu($args->{-name}, $args->{-values}, $args->{-default});
+    } elsif ($item->{type} eq 'checkbox') {
+        $args->{"-default"} ||= $args->{"-value"};
+        $field = checkbox_group($args->{-name}, $args->{-values}, $args->{-default});
     } elsif ($item->{type} eq 'radio') {
-        $args->{"-value"} = [$item->{value}];
-        $field = radio_group(%$args);
+        $args->{"-default"} ||= $args->{"-value"};
+        $field = radio_group($args->{-name}, $args->{-values}, $args->{-default});
     } else {
         $field = textfield(%$args);
     }
@@ -142,7 +149,7 @@ sub build_field {
 }
 
 #---------------------------------------------------------------------------
-# Build the form that gats tuser input
+# Build the form that gets user input
 
 sub build_form {
     my ($self, $results) = @_;
@@ -152,7 +159,7 @@ sub build_form {
 
     # Figure out which templates we have
 
-    my @templates;   
+    my @templates;
     push(@templates, $self->{site_template}) if $self->{site_template};
     push(@templates, $self->template_object($results));
 
@@ -172,7 +179,7 @@ sub build_form_fields {
 
     foreach my $item (@{$results->{items}}) {
         next if $item->{name} eq 'cmd';
-        
+
         $item->{title} = $item->{title} || ucfirst($item->{name});
         $item->{field} = $self->build_field($item);
     }
@@ -185,7 +192,7 @@ sub build_form_fields {
 
 sub info_object {
     my ($self, $results) = @_;
-    
+
     my $info;
     if ($self->{code_ptr}->can('info_object')) {
         $info = $self->{code_ptr}->info_object($results);
@@ -227,39 +234,15 @@ sub parse_validator {
 }
 
 #----------------------------------------------------------------------
-# Read the file and extract the content, put into results body field
-
-sub populate_items {
-    my ($self, $results) = @_;
-
-    my $filename = $self->{webfile_ptr}->url_to_filename($results->{url});
-    my $text = $self->{webfile_ptr}->reader($filename);
-
-    my $section = $self->{template_ptr}->parse_sections($text);
-
-    my $body = $section->{$self->{body_tag}};
-    $self->{body} = $body;
-    
-    foreach my $item (@{$results->{items}}) {
-        if ($item->{name} eq 'body') {
-            $item->{value} = $body;
-            last;
-        }
-    }
-
-    return;
-}
-
-#----------------------------------------------------------------------
 # Read the data to be displayed in the form
 
 sub read_object {
     my ($self, $results) = @_;
-    
+
     if ($self->{code_ptr}->can('read_object')) {
         $self->{code_ptr}->read_object($results);
     }
-    
+
     return;
 }
 
@@ -268,14 +251,14 @@ sub read_object {
 
 sub template_object {
     my ($self, $results) = @_;
-    
+
     my $subtemplate;
     if ($self->{code_ptr}->can('template_object')) {
         $subtemplate = $self->{code_ptr}->template_object($results);
     } else {
         die "No template data";
     }
-    
+
     return $subtemplate;
 }
 
@@ -284,7 +267,7 @@ sub template_object {
 
 sub trim_value {
     my ($self, $value) = @_;
-    
+
     $value =~ s/^\s+//;
     $value =~ s/\s+$//;
     return $value;
@@ -296,7 +279,7 @@ sub trim_value {
 sub update_result_items {
     my ($self, $results, $request) = @_;
     $request = $results unless defined $request;
-    
+
     foreach my $item (@{$results->{items}}) {
         my $field = $item->{name};
         if (exists $request->{$field}) {
@@ -307,7 +290,7 @@ sub update_result_items {
             $item->{value} = '';
         }
     }
-   
+
     return;
 }
 
@@ -316,12 +299,12 @@ sub update_result_items {
 
 sub use_object {
     my ($self, $results) = @_;
-    
+
     my $redirect;
     if ($self->{code_ptr}->can('use_object')) {
         $redirect = $self->{code_ptr}->use_object($results);
     }
-    
+
     return $redirect;
 }
 
@@ -330,11 +313,11 @@ sub use_object {
 
 sub valid_datatype {
     my ($self, $item) = @_;
-    
+
     my $flag;
     my $value = $item->{value};
     my $datatype = $item->{datatype};
-    
+
     if ($datatype eq 'email') {
         $flag = $self->valid_email($value);
     } elsif ($datatype eq 'int') {
@@ -348,7 +331,7 @@ sub valid_datatype {
     } else {
         die "Unrecognized datatype: $datatype\n";
     }
-    
+
     return $flag;
 }
 
@@ -357,7 +340,7 @@ sub valid_datatype {
 
 sub valid_email {
     my ($self, $value) = @_;
-    
+
     return $value =~ m#^[\w\-\.\*]{1,100}\@[\w\-\.]{1,100}$#;
 }
 
@@ -406,7 +389,7 @@ sub valid_numeric_limits {
     my $value = $item->{value};
 
     return $self->valid_limits($limits, $value);
-}    
+}
 
 #----------------------------------------------------------------------
 # Validate string value against limits
@@ -418,7 +401,7 @@ sub valid_string_limits {
     my $limits = $item->{limits};
 
     return $self->valid_limits($limits, $value);
-}    
+}
 
 #----------------------------------------------------------------------
 # Check if the value is a number
@@ -474,7 +457,7 @@ sub valid_string_selection {
 
 sub valid_url {
     my ($self, $value) = @_;
-    
+
     my $filename = $self->{webfile_ptr}->url_to_filename($value);
     return defined $filename && -e $filename;
 }
@@ -505,7 +488,7 @@ sub validate {
 
         $bad ||= $item->{regexp} && ! $self->valid_regexp($item);
     }
-        
+
     return $bad;
 }
 
@@ -514,12 +497,12 @@ sub validate {
 
 sub validate_object {
     my ($self, $results) = @_;
-    
+
     my $msg;
     if ($self->{code_ptr}->can('validate_object')) {
         $msg = $self->{code_ptr}->validate_object($results);
     }
-    
+
     return $msg;
 }
 
@@ -546,7 +529,7 @@ sub validate_items {
 
     my $msg = $self->validate_object($results);
     push(@message, $msg) if $msg;
-    
+
     $results->{msg} = join("<br>\n", @message) if @message;
     return @message ? 0 : 1;
 }

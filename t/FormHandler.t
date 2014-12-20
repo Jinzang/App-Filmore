@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 use strict;
 
-use Test::More tests => 45;
+use Test::More tests => 47;
 
 use Cwd;
 use IO::File;
@@ -40,7 +40,7 @@ my $fh = Filmore::FormHandler->new(code_ptr => 'MinMax');
 do {
     my $item = {valid => ''};
     my $item_ok = {valid => '', datatype => 'string'};
-    
+
 	$fh->parse_validator($item);
 	is_deeply($item, $item_ok, "Empty validator"); # Test 1
 };
@@ -48,7 +48,7 @@ do {
 do {
     my $item = {valid => 'number'};
     my $item_ok = {valid => 'number', datatype => 'number'};
-    
+
 	$fh->parse_validator($item);
 	is_deeply($item, $item_ok, "Number validator"); # Test 2
 
@@ -59,7 +59,7 @@ do {
     $item->{value} = '23';
 	$b = $fh->validate($item);
 	is($b, undef, "Validate naumber"); # Test 4
-    
+
     $item->{value} = 'a23';
 	$b = $fh->validate($item);
 	is($b, 1, "Validate non-naumber"); # Test 5
@@ -68,7 +68,7 @@ do {
 do {
     my $item = {valid => '&number'};
     my $item_ok = {valid => '&number', datatype => 'number', required => 1};
-    
+
 	$fh->parse_validator($item);
 	is_deeply($item, $item_ok, "Required number validator"); # Test 6
 
@@ -81,7 +81,7 @@ do {
     my $item = {valid => '/\$\d+\.\d\d/'};
     my $item_ok = {valid => '/\$\d+\.\d\d/', regexp => '\$\d+\.\d\d',
                    datatype => 'string'};
-    
+
 	$fh->parse_validator($item);
 	is_deeply($item, $item_ok, "String regexp"); # Test 8
 
@@ -98,14 +98,14 @@ do {
     my $item = {valid => '|joe|jack|jim|'};
     my $item_ok = {valid => '|joe|jack|jim|', selection => 'joe|jack|jim',
                    datatype => 'string'};
-    
+
 	$fh->parse_validator($item);
 	is_deeply($item, $item_ok, "String selector"); # Test 11
 
     $item->{value} = 'jack';
 	my $b = $fh->validate($item);
 	is($b, undef, "Validate valid selector string"); # Test 12
-    
+
     $item->{value} = 'jason';
 	$b = $fh->validate($item);
 	is($b, 1, "Validate invalid selector string"); # Test 13
@@ -115,7 +115,7 @@ do {
     my $item = {valid => 'number|10|20|30|'};
     my $item_ok = {valid => 'number|10|20|30|', datatype => 'number',
                    selection => '10|20|30'};
-    
+
 	$fh->parse_validator($item);
 	is_deeply($item, $item_ok, "Number selector"); # Test 14
 
@@ -240,38 +240,72 @@ do {
 do {
     my $item = {valid => 'string[5,]', name => 'foo', value => 'bar'};
 
-	$fh->parse_validator($item);
-	my $field = $fh->build_field($item);
-	is($field, '<input type="text" name="foo" value="bar" />',
-	   "Form text field"); # Test 38
+    $fh->parse_validator($item);
+    my $field = $fh->build_field($item);
+    is($field, '<input type="text" name="foo" value="bar" />',
+       "Form text field"); # Test 38
 
     $item->{type} = 'textarea';
-	$field = $fh->build_field($item);
-	is($field, '<textarea name="foo" >bar</textarea>',
-	   "Form textarea"); # Test 39
+    $field = $fh->build_field($item);
+    is($field, '<textarea name="foo" >bar</textarea>',
+       "Form textarea"); # Test 39
 
     $item->{style} = 'rows=20;cols=64';
-	$field = $fh->build_field($item);
-	is($field,
-	   '<textarea name="foo" rows="20" cols="64">bar</textarea>',
-	   "Form textarea with style"); # Test 40
+    $field = $fh->build_field($item);
+    is($field,
+       '<textarea name="foo" rows="20" cols="64">bar</textarea>',
+       "Form textarea with style"); # Test 40
 
     delete $item->{type};
     delete $item->{style};
     delete $item->{limits};
     $item->{valid} = 'string|bar|biz|baz|';
-	$fh->parse_validator($item);
-    
-	$field = $fh->build_field($item);
-	my $r = <<EOQ;
+    $fh->parse_validator($item);
+
+    $field = $fh->build_field($item);
+    my $r = <<EOQ;
 <select name="foo" >
 <option selected="selected" value="bar">bar</option>
 <option value="biz">biz</option>
 <option value="baz">baz</option>
 </select>
 EOQ
-	chomp $r;
-	is($field, $r, "Form selection"); # Test 41
+    chomp $r;
+    is($field, $r, "Form selection"); # Test 41
+
+    delete $item->{type};
+    delete $item->{style};
+    delete $item->{limits};
+    $item->{type} = 'radio';
+    $item->{valid} = 'string|bar|biz|baz|';
+    $fh->parse_validator($item);
+
+    $field = $fh->build_field($item);
+    $r = <<EOQ;
+<label><input type="radio" name="foo" value="bar" checked="checked" />bar</label>
+<label><input type="radio" name="foo" value="biz" />biz</label>
+<label><input type="radio" name="foo" value="baz" />baz</label>
+EOQ
+    chomp $r;
+    $r =~ s/\n/ /g;
+    is($field, $r, "Form radio buttons"); # Test 42
+
+    delete $item->{type};
+    delete $item->{style};
+    delete $item->{limits};
+    $item->{type} = 'checkbox';
+    $item->{valid} = 'string|bar|biz|baz|';
+    $fh->parse_validator($item);
+
+    $field = $fh->build_field($item);
+    $r = <<EOQ;
+<label><input type="checkbox" name="foo" value="bar" checked="checked" />bar</label>
+<label><input type="checkbox" name="foo" value="biz" />biz</label>
+<label><input type="checkbox" name="foo" value="baz" />baz</label>
+EOQ
+    chomp $r;
+    $r =~ s/\n/ /g;
+    is($field, $r, "Form checkboxes"); # Test 43
 };
 
 do {
@@ -279,25 +313,25 @@ do {
                    script_url => 'http://www.example.com/test.cgi',
                    cmd => 'Check',
                    };
-    
+
     $request->{value} = 7;
     my $response = $fh->run($request);
     like($response->content, qr/Value in bounds/,
-         "Run valid request"); # test 42
-    
+         "Run valid request"); # test 44
+
     $request->{value} = 25;
     $response = $fh->run($request);
     like($response->content, qr/Value out of bounds/,
-         "Run invalid request"); # test 43
-    
+         "Run invalid request"); # test 45
+
     delete $request->{value};
     $response = $fh->run($request);
     like($response->content, qr/Required field value is missing/,
-         "Run empty request"); # test 44
-    
+         "Run empty request"); # test 46
+
     delete $request->{cmd};
     $response = $fh->run($request);
     like($response->content, qr/Please enter a value/,
-         "Run request with no commands"); # test 45
-    
+         "Run request with no commands"); # test 47
+
 };
