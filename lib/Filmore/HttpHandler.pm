@@ -14,7 +14,8 @@ use IO::File;
 use HTTP::Daemon;
 use HTTP::Request;
 use HTTP::Response;
-use File::Spec::Functions qw(abs2rel rel2abs splitdir);
+use File::Spec::Functions qw(abs2rel catfile rel2abs splitdir);
+use Filmore::FormHandler;
 
 use constant ERROR_TEMPLATE => <<'EOS';
 <head><title>Script Error</title></head>
@@ -32,8 +33,10 @@ sub parameters {
   my ($pkg) = @_;
 
     return (
+            base_directory => '',
             nofork => 0,
             port => 8080,
+            log_file => '',
             index_file => 'index.html',
             webfile_ptr => 'Filmore::WebFile',
 	);
@@ -47,9 +50,8 @@ sub run {
 
     $| = 1;
     $SIG{CHLD} = 'IGNORE';
-    chdir ($self->{base_directory});
-    
-    my $routes = $self->parse_routes($route_table);
+    $self->{webfile_ptr}->relocate($self->{base_directory});
+    $self->{routes} = $self->parse_routes($route_table);
     
     my $d = HTTP::Daemon->new(
                               Reuse => 1,
@@ -57,13 +59,17 @@ sub run {
                               LocalPort => $self->{port},
                              );
 
+    $self->log("Start $0");
     while (my $connection = $d->accept) {
         next unless $self->{nofork} || ! fork();
 
-        $self->handle_connection($connection, $routes);
+        eval {$self->handle_connection($connection)};
+        $self->log($@) if $@;
+
         exit unless $self->{nofork};
     }
     
+    $self->log("End $0");
     return;
 }
 
@@ -72,13 +78,8 @@ sub run {
 
 sub add_urls {
     my ($self, $request, $url) = @_;
+    $url = '/' unless defined $url;
     
-    my $path = rel2abs($0);
-    my ($directory, $filename) = $self->{webfile_ptr}->split_filename($path);
-
-    $request->{script_directory} = $directory;
-    $request->{base_directory} = $request->{script_directory};
-
     my $parsed_url = $self->{webfile_ptr}->parse_url($url);
     $request->{script_url} = $parsed_url->{path};
 
@@ -91,23 +92,33 @@ sub add_urls {
 }
 
 #----------------------------------------------------------------------
+# Build date fields from time, based on Blosxom 3
+
+sub build_date {
+    my ($self) = @_;
+    
+    my @time =  split(/\W+/, localtime(time()));
+
+    my $date =  sprintf("%02d:%02d:%02d %02d %s %02d",
+                        $time[3], $time[4], $time[5],
+                        $time[2], $time[1], $time[6] % 100);
+
+    return $date;
+}
+
+#----------------------------------------------------------------------
 # Handle a request that has come in
 
 sub handle_connection {
     local $SIG{PIPE} = 'IGNORE';
-    my ($self, $connection, $routes) = @_;
+    my ($self, $connection) = @_;
 
     while (my $r = $connection->get_request()) {
-        my $request = $self->parse_request($r);
-        my $handler = $self->route_request($routes, $request);
-
-        my $response = HTTP::Response->new();
+        my ($request, $response);
         eval {
-            if ($handler) {
-                $response = $handler->run($request, $response);
-            } else {
-                $response = $self->handle_file($request, $response);
-            }
+            $request = $self->request($r);
+            $response = HTTP::Response->new();
+            $response = $self->response($request, $response);
         };
         
         if ($@) {
@@ -130,58 +141,64 @@ sub handle_connection {
 
 sub handle_file {
     my ($self, $request, $response) = @_;
-    
-    my @path = split(/\//, $request->{url});
-    my $file = catfile($self->{base_directory}, @path);
+
+    my $parsed_url = $self->{webfile_ptr}->parse_url($request->{script_url});
+    my ($front, @path) = split(/\//, $parsed_url->{path});
+
+    my $file = catfile($self->{base_directory}, @path, $parsed_url->{file});
     $file = catfile($file, $self->{index_file}) if -d $file;
 
     my $ok;
     $file = abs2rel($file);
-    if ($file !~ /^\.\./ && -e $file) {
+    if ($file !~ /\.\./ && -e $file) {
         # Copy file into response
 
-        my $fd = new IO::File($file. 'r');
+        my $fd = IO::File->new($file, 'r');
         if (defined $fd) {
             $ok = 1;
             local $/;
 
             binmode $fd;
             $response->content(<$fd>);
+            close($fd);
         }
-
-        close($fd);
     }
     
     if ($ok) {
         $response->code(200);
-        $response->message('Ok');
     } else {
         $response->code(404);
-        $response->message('Not found');
     }
     
     return $response;
 };
 
 #----------------------------------------------------------------------
+# Write a message to the log file
+
+sub log {
+    my ($self, $msg) = @_;
+    
+    my $file = $self->{log};
+    my $fd = IO::File->new($self->{log}, 'a');
+    my $date = $self->build_date();
+    
+    if ($fd) {
+        print $fd "$date $msg\n";
+    } else {
+        print "$date $msg\n";
+    }
+    
+
+    return;
+}
+
+#----------------------------------------------------------------------
 # Parse information in the request
 
 sub parse_request {
-    my ($self, $r) = @_;
-        
-    # Parse the script parameters
-
-    my $method = uc($r->method);
-    my $url = $r->url;
-
-    my $params;  
-    if ($method eq 'GET') {
-        $params = $1; 
-
-    } elsif ($method eq 'POST') {
-        $params = $r->content;
-    }
-
+    my ($self, $params) = @_;
+    
     my $request = {};
     if ($params) {
         $params =~ s/\+/ /g;
@@ -192,11 +209,10 @@ sub parse_request {
             $value = 1 unless defined $value;
 
             $value =~ s/%([0-9a-fA-F][0-9a-fA-F])/chr(hex($1))/eg;
-            set_request($request, $field, $value);
+            $self->set_request($request, $field, $value);
         }
     }
 
-    $request = $self->add_urls($request, $url);
     return $request;
 }
 
@@ -220,7 +236,7 @@ sub parse_routes {
         $entry->{config_file} = "$name.cfg";
         $entry->{base_directory} ||= $self->{base_directory};
         
-        my $object = Filmore::FormHandlder->new($entry);
+        my $object = Filmore::FormHandler->new(%$entry);
         push(@routes, {name => $name, path =>\@path, object => $object});
     }
 
@@ -228,14 +244,57 @@ sub parse_routes {
 }
 
 #----------------------------------------------------------------------
+# Parse information in the request
+
+sub request {
+    my ($self, $r) = @_;
+        
+    # Parse the script parameters
+
+    my $params;  
+    my $method = uc($r->method);
+
+    if ($method eq 'GET') {
+        $params = $1; 
+
+    } elsif ($method eq 'POST') {
+        $params = $r->content;
+    }
+
+    my $request = $self->parse_request($params);
+
+    my $url = $r->url;
+    $request = $self->add_urls($request, $url);
+
+    return $request;
+}
+
+#----------------------------------------------------------------------
+# Generate the response for the request
+
+sub response {
+    my ($self, $request, $response) = @_;
+
+    my $handler = $self->route_request($request);
+    if ($handler) {
+        $response = $handler->run($request, $response);
+    } else {
+        $response = $self->handle_file($request, $response);
+    }
+
+    return $response;    
+}
+
+#----------------------------------------------------------------------
 # Determine the handler to handle the request
 
 sub route_request {
-    my ($self, $routes, $request) = @_;
+    my ($self, $request) = @_;
 
-    my ($front, $name, @extra_path) = split(/\//, $request->{script_url});
+    my $parsed_url = $self->{webfile_ptr}->parse_url($request->{script_url});
+    my ($front, $name, @extra_path) = split(/\//, $parsed_url->{path});
     
-    foreach my $route (@$routes) {
+    foreach my $route (@{$self->{routes}}) {
         next unless $route->{name} eq $name;
 
         foreach my $field (@{$route->{path}}) {
@@ -265,7 +324,7 @@ sub send_response {
 # Set a field in the request
 
 sub set_request {
-    my ($request, $field, $value) = @_;
+    my ($self, $request, $field, $value) = @_;
 
     if (exists $request->{$field}) {
         if (ref $request->{$field}) {
