@@ -83,10 +83,10 @@ do {
 
 do {
     my $array = join("\000", qw(a b c));
-    my %args = (first => 1, second => 2, third => $array);
+    my $args = {first => 1, second => 2, third => $array};
  
     $o->{base_url} = $base_url;
-    my $request = $o->request(%args);
+    my $request = $o->request($args);
     
     my $request_ok = {first => 1,
                       second => 2,
@@ -122,7 +122,8 @@ EOQ
                     script_url => "$base_url/CgiHandler.t",
                     };
     
-    my $response = $o->response($request);
+    my $response = Filmore::Response->new;
+    $response = $o->response($request, $response);
 
     my $response_ok = {
                         code => 200,

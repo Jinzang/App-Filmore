@@ -69,21 +69,21 @@ sub parameters {
 # Run the cgi script, print the result
 
 sub run {
-    my ($self, %args) = @_;
+    my ($self, $args) = @_;
 
     my ($request, $response);
     eval {
-        $request = $self->request(%args);
-        $response = $self->response($request);
+        $request = $self->request($args);
+        $response = Filmore::Response->new;
+        $response = $self->response($request, $response);
     };
     
     if ($@) {
-        $response ||= Filmore::Response->new;
         $response->content($self->error($request, $@));
         $response->code(200);
     }
 
-    $self->send_response($response) unless %args;
+    $self->send_response($response) unless $args;
     return $response->content || '';
 }
 
@@ -190,12 +190,15 @@ sub render {
 # Get arguments used in handling cgi request
 
 sub request {
-    my ($self, %args) = @_;
+    my ($self, $args) = @_;
 
-    # %args is an optional hash containg request parameters
+    # $args is an optional hash containg request parameters
     # that is used for debugging
-    my %request = %args;
-    if (! %request) {
+
+    my %request;
+    if ($args) {
+        %request = %$args;
+    } else {
         my $cgi = CGI->new();
         %request = $cgi->Vars();
     }
@@ -218,10 +221,9 @@ sub request {
 # Call the handler to get the response to the request
 
 sub response {
-    my ($self, $request) = @_;
+    my ($self, $request, $response) = @_;
 
     my $result;
-    my $response = Filmore::Response->new();
 
     eval {
         # Relocate to base directory, if defined
