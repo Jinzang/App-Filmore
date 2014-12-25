@@ -34,10 +34,10 @@ sub use_object {
     my ($self, $results) = @_;
 
     my $redirect = 1;
+    $self->{userdata_ptr}->update_password_file($results->{email});
+
     $self->{userdata_ptr}->update_groups_file($results->{email},
                                               $results->{groups});
-
-    ## TODO add password method
     return $redirect;
 }
 
