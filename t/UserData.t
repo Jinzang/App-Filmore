@@ -59,23 +59,25 @@ EOQ
     my $passwords = $ud->read_password_file();
     is_deeply($passwords, $passwords_ok, "Read password file"); # test 1
 
-    my $request = {user => 'baz@test.com', pass1 => 'secret'};
-    $ud->write_password_file($request);
+    $passwords->{'baz@test.com'} = 'secret';
+    my %new_passwords = %$passwords;
 
+    $ud->write_password_file($passwords);
     $passwords = $ud->read_password_file();
 
     my @password_keys = sort keys %$passwords;
-    my $password_keys_ok = [qw(bar@test.com baz@test.com foo@test.com )];
+    my @password_keys_ok = sort keys %new_passwords;
 
-    is_deeply(\@password_keys, $password_keys_ok, "Add password"); # test 2
+    is_deeply(\@password_keys, \@password_keys_ok, "Add password"); # test 2
 
-    $ud->write_password_file($request, 1);
+    delete $passwords->{'baz@test.com'};
+    $ud->write_password_file($passwords);
     $passwords = $ud->read_password_file();
 
     @password_keys = sort keys %$passwords;
-    $password_keys_ok = [qw(bar@test.com foo@test.com )];
+    @password_keys_ok = sort keys %$passwords_ok;
 
-    is_deeply(\@password_keys, $password_keys_ok, "Delete password"); # test 3
+    is_deeply(\@password_keys, \@password_keys_ok, "Delete password"); # test 3
 };
 
 #----------------------------------------------------------------------
@@ -98,8 +100,7 @@ EOQ
     my $groups = $ud->read_groups_file();
     is_deeply($groups, $groups_ok, "Read group file"); # test 4
 
-    my $request = {user => 'baz@test.com', groups => [qw(script1 script2)]};
-    $ud->write_groups_file($request);
+    $ud->update_groups_file('baz@test.com', [qw(script1 script2)]);
 
     $groups_ok->{script1}{'baz@test.com'} = 1;
     $groups_ok->{script2}{'baz@test.com'} = 1;
@@ -107,8 +108,7 @@ EOQ
     $groups = $ud->read_groups_file();
     is_deeply($groups, $groups_ok, "Add groups"); # test 5
 
-    $request = {user => 'bar@test.com', groups => []};
-    $ud->write_groups_file($request);
+    $ud->update_groups_file('bar@test.com', []);
 
     delete $groups_ok->{script2}{'bar@test.com'};
     $groups = $ud->read_groups_file();

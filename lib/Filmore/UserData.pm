@@ -23,16 +23,6 @@ sub parameters {
 }
 
 #----------------------------------------------------------------------
-# Encrypt password
-
-sub encrypt {
-    my ($self, $plain) = @_;;
-
-    my $salt = join '', ('.', '/', 0..9, 'A'..'Z', 'a'..'z')[rand 64, rand 64];
-    return crypt($plain, $salt);
-}
-
-#----------------------------------------------------------------------
 # Read the groups file
 
 sub read_groups_file {
@@ -82,17 +72,16 @@ sub read_password_file {
 #----------------------------------------------------------------------
 # Write group file for password protected site
 
-sub write_groups_file {
-    my ($self, $request) = @_;
+sub update_groups_file {
+    my ($self, $user, $user_groups) = @_;
 
     my @lines;
     my $groups = $self->read_groups_file();
 
-    my $user = $request->{user};
-    my %request_groups = map {$_ => 1} @{$request->{groups}};
+    my %user_groups = map {$_ => 1} @{$user_groups};
 
     foreach my $group (sort keys %$groups) {
-        if ($request_groups{$group}) {
+        if ($user_groups{$group}) {
             $groups->{$group}{$user} = 1;
         } else {
             delete $groups->{$group}{$user};
@@ -110,18 +99,10 @@ sub write_groups_file {
 }
 
 #----------------------------------------------------------------------
-# Write password file
+#Write modified passwords back to disk
 
 sub write_password_file {
-    my ($self, $request, $delete)= @_;
-
-    my $passwords = $self->read_password_file();
-
-    if ($delete) {
-        delete $passwords->{$request->{user}};
-    } else {
-        $passwords->{$request->{user}} = $self->encrypt($request->{pass1});
-    }
+    my ($self, $passwords)= @_;
 
     my @lines;
     foreach my $user (sort keys %$passwords) {
