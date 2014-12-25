@@ -23,6 +23,29 @@ sub parameters {
 }
 
 #----------------------------------------------------------------------
+# Encrypt password
+
+sub encrypt {
+    my ($self, $plain) = @_;;
+
+    my $salt = $self->random_string(2);
+    return crypt($plain, $salt);
+}
+
+#----------------------------------------------------------------------
+# Generate a random string
+
+sub random_string {
+    my ($self, $length) = @_;
+
+    my @string;
+    push(@string, ('.', '/', 0..9, 'A'..'Z', 'a'..'z')[rand 64])
+        for 1 .. $length;
+
+    return join('', @string);
+}
+
+#----------------------------------------------------------------------
 # Read the groups file
 
 sub read_groups_file {
@@ -99,7 +122,23 @@ sub update_groups_file {
 }
 
 #----------------------------------------------------------------------
-#Write modified passwords back to disk
+# Generate a new random password for a user
+
+sub update_password_file {
+    my ($self, $user) = @_;
+
+    my $word = $self->random_string(12);
+    $word = $self->encrypt($word);
+
+    my $passwords = $self->read_password_file();
+    $passwords->{$user} = $word;
+    $self->write_password_file($passwords);
+
+    return;
+}
+
+#----------------------------------------------------------------------
+# Write modified passwords back to disk
 
 sub write_password_file {
     my ($self, $passwords)= @_;

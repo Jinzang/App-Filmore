@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 use strict;
 
-use Test::More tests => 6;
+use Test::More tests => 8;
 
 use Cwd;
 use IO::File;
@@ -81,7 +81,7 @@ EOQ
 };
 
 #----------------------------------------------------------------------
-# Read and write group file
+# Update groups file
 
 do {
     my $text = <<'EOQ';
@@ -114,4 +114,19 @@ EOQ
     $groups = $ud->read_groups_file();
 
     is_deeply($groups, $groups_ok, "Delete groups"); # test 6
+};
+
+#----------------------------------------------------------------------
+# Update password file
+
+do {
+    my $user = 'baz@stsci.edu';
+
+    my $pass = $ud->random_string(12);
+    is(length $pass, 12, "Random password"); # test 7
+
+    $ud->update_password_file($user);
+    my $passwords = $ud->read_password_file();
+
+    ok(exists $passwords->{$user}, "Update passwords file"); # test 8
 };
