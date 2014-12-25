@@ -15,7 +15,8 @@ sub parameters {
     my ($pkg) = @_;
 
     return (
-        userdata_ptr => 'Filmore::UserData'
+        web_master => '',
+        userdata_ptr => 'Filmore::UserData',
     );
 }
 
@@ -118,6 +119,8 @@ sub validate_object {
     my ($self, $results) = @_;
 
     my $user = $results->{email};
+    return "Cannot change web master groups" if $user eq $self->{web_master};
+
     my $passwords = $self->{userdata_ptr}->read_password_file();
     return "User not found: $user" unless exists $passwords->{$user};
 

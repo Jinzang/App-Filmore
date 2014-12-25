@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 use strict;
 
-use Test::More tests => 5;
+use Test::More tests => 6;
 
 use Cwd;
 use IO::File;
@@ -32,6 +32,7 @@ chdir $base_dir;
 $base_dir = getcwd();
 
 my %params = (
+              web_master => 'poobah@test.com',
               valid_write => [$base_dir],
               base_directory => $base_dir,
               );
@@ -98,8 +99,13 @@ do  {
     $msg = $eu->validate_object($results);
     is($msg, "User not found: $bad_mail", "Validate bad user"); # test 4
 
+    $bad_mail = $params{web_master};
+    $results = {email => $bad_mail, group => $groups};
+    $msg = $eu->validate_object($results);
+    is($msg, "Cannot change web master groups", "Validate web master"); # test 5
+
     my $bad_groups = [qw(script3)];
     $results = {email => $email, group => $bad_groups};
     $msg = $eu->validate_object($results);
-    is($msg, "Group not found: $bad_groups->[0]", "Validate bad group"); # test 5
+    is($msg, "Group not found: $bad_groups->[0]", "Validate bad group"); # test 6
 };
