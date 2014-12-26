@@ -493,27 +493,18 @@ sub validate {
 }
 
 #----------------------------------------------------------------------
-# Call method to validate results if it is present
-
-sub validate_object {
-    my ($self, $results) = @_;
-
-    my $msg;
-    if ($self->{code_ptr}->can('validate_object')) {
-        $msg = $self->{code_ptr}->validate_object($results);
-    }
-
-    return $msg;
-}
-
-#----------------------------------------------------------------------
 # Validate the items contained on a form
 
 sub validate_items {
     my ($self, $results) = @_;
 
     my @message;
+    my %seen = ();
+
     foreach my $item (@{$results->{items}}) {
+        next if $seen{$item->{name}};
+
+        $seen{$item->{name}} = 1;
         $self->parse_validator($item);
 
         my $msg;
@@ -532,6 +523,20 @@ sub validate_items {
 
     $results->{msg} = join("<br>\n", @message) if @message;
     return @message ? 0 : 1;
+}
+
+#----------------------------------------------------------------------
+# Call method to validate results if it is present
+
+sub validate_object {
+    my ($self, $results) = @_;
+
+    my $msg;
+    if ($self->{code_ptr}->can('validate_object')) {
+        $msg = $self->{code_ptr}->validate_object($results);
+    }
+
+    return $msg;
 }
 
 1;
