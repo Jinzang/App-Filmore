@@ -20,7 +20,7 @@ sub parameters {
         browse_ptr => 'Filmore::BrowseUser',
         edit_ptr => 'Filmore::EditUser',
         add_ptr => 'Filmore::AddUser',
-        delete_ptr => 'Filemore::DeleteUser',
+        remove_ptr => 'Filmore::RemoveUser',
      );
 }
 
@@ -31,9 +31,11 @@ sub get_command {
     my ($self, $results) = @_;
 
     my $cmd = $results->{cmd} || '';
-    my @commands = grep {$_} (DEFAULT_CMD, lc($cmd));
+    my @commands = (lc($cmd), DEFAULT_CMD);
 
-    for my $command (@commands) {
+    foreach my $command (@commands) {
+        next unless $command;
+
         $cmd = $command . '_ptr';
         return $cmd if exists $self->{$cmd};
     }
@@ -59,7 +61,6 @@ sub read_object {
 
     my $cmd = $self->get_command($results);
     $self->{$cmd}->read_object($results);
-
     return;
 }
 
