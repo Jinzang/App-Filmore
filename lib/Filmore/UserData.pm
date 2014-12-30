@@ -6,6 +6,7 @@ package Filmore::UserData;
 use lib '../../lib';
 use base qw(Filmore::ConfiguredObject);
 
+use Digest::MD5 qw(md5_hex);
 use File::Spec::Functions qw(catfile rel2abs abs2rel splitdir);
 
 our $VERSION = '0.01';
@@ -17,6 +18,7 @@ sub parameters {
     my ($pkg) = @_;
 
     return (
+        nonce => 0,
         base_directory => '',
         webfile_ptr => 'Filmore::WebFile',
     );
@@ -30,6 +32,17 @@ sub encrypt {
 
     my $salt = $self->random_string(2);
     return crypt($plain, $salt);
+}
+
+#----------------------------------------------------------------------
+# Create the nonce for validated form input
+
+sub get_nonce {
+    my ($self) = @_;
+    return $self->{nonce} if $self->{nonce};
+
+    my $nonce = time() / 24000;
+    return md5_hex($(, $nonce, $>);
 }
 
 #----------------------------------------------------------------------

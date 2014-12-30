@@ -33,8 +33,8 @@ sub info_object {
 
     my $info = [{name => 'email',
                  title => 'Email Address',
-                 type => 'hidden',
-                 style => '', # TODO
+                 type => 'radio',
+                 style => 'linebreak=1',
                  valid => "\&string|$users|"}];
     return $info;
 }

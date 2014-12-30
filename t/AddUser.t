@@ -30,10 +30,12 @@ rmtree($base_dir);
 mkdir $base_dir;
 chdir $base_dir;
 $base_dir = getcwd();
+my $nonce = 123;
 
 my %params = (
               valid_write => [$base_dir],
               base_directory => $base_dir,
+              nonce => $nonce,
               );
 
 my $au = Filmore::AddUser->new(%params);
@@ -66,18 +68,18 @@ EOQ
 do  {
     my $email = 'blue@test.com';
     my $groups = [qw(script1 script2)];
-    my $results = {email => $email, group => $groups};
+    my $results = {email => $email, group => $groups, nonce => $nonce};
 
     my $msg = $au->validate_object($results);
     is($msg, undef, "Validate request"); # test 1
 
     my $bad_mail = 'foo@test.com';
-    $results = {email => $bad_mail, group => $groups};
+    $results = {email => $bad_mail, group => $groups, nonce => $nonce};
     $msg = $au->validate_object($results);
     is($msg, "User already exists: $bad_mail", "Validate bad user"); # test 2
 
     my $bad_groups = [qw(script3)];
-    $results = {email => $email, group => $bad_groups};
+    $results = {email => $email, group => $bad_groups, nonce => $nonce};
     $msg = $au->validate_object($results);
     is($msg, "Group not found: $bad_groups->[0]", "Validate bad group"); # test 3
 };

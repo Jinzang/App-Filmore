@@ -519,7 +519,7 @@ sub validate_items {
     }
 
     my $msg = $self->validate_object($results);
-    push(@message, $msg) if $msg;
+    push(@message, $msg) if defined $msg;
 
     $results->{msg} = join("<br>\n", @message) if @message;
     return @message ? 0 : 1;

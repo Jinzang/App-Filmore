@@ -24,6 +24,8 @@ sub parameters {
 
 sub read_object {
     my ($self, $results) = @_;
+
+    $results->{nonce} = $self->{userdata_ptr}->get__nonce();
     return;
 }
 
@@ -60,6 +62,7 @@ sub validate_object {
     }
 
     return "Group not found: " . join(',', @groups) if @groups;
+    return "" if $results->{nonce} ne $self->{userdata_ptr}->get_nonce();
 
     return;
 }

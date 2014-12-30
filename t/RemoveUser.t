@@ -31,11 +31,13 @@ rmtree($base_dir);
 mkdir $base_dir;
 chdir $base_dir;
 $base_dir = getcwd();
+my $nonce = 123;
 
 my %params = (
               web_master => 'poobah@test.com',
               valid_write => [$base_dir],
               base_directory => $base_dir,
+              nonce => $nonce,
               );
 
 my $ru = Filmore::RemoveUser->new(%params);
@@ -68,18 +70,18 @@ EOQ
 
 do  {
     my $email = 'foo@test.com';
-    my $results = {email => $email};
+    my $results = {email => $email, nonce => $nonce};
 
     my $msg = $ru->validate_object($results);
     is($msg, undef, "Validate request"); # test 1
 
     my $bad_mail = 'blue@test.com';
-    $results = {email => $bad_mail};
+    $results = {email => $bad_mail, nonce => $nonce};
     $msg = $ru->validate_object($results);
     is($msg, "User not found: $bad_mail", "Validate bad user"); # test 2
 
     $bad_mail = $params{web_master};
-    $results = {email => $bad_mail};
+    $results = {email => $bad_mail, nonce => $nonce};
     $msg = $ru->validate_object($results);
     is($msg, "Cannot remove web master", "Validate web master"); # test 3
 };

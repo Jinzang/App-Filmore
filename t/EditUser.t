@@ -30,11 +30,13 @@ rmtree($base_dir);
 mkdir $base_dir;
 chdir $base_dir;
 $base_dir = getcwd();
+my $nonce = 123;
 
 my %params = (
               web_master => 'poobah@test.com',
               valid_write => [$base_dir],
               base_directory => $base_dir,
+              nonce => $nonce,
               );
 
 my $eu = Filmore::EditUser->new(%params);
@@ -89,23 +91,23 @@ do {
 do  {
     my $email = 'foo@test.com';
     my $groups = [qw(script1 script2)];
-    my $results = {email => $email, group => $groups};
+    my $results = {email => $email, group => $groups, nonce => $nonce};
 
     my $msg = $eu->validate_object($results);
     is($msg, undef, "Validate request"); # test 3
 
     my $bad_mail = 'blue@test.com';
-    $results = {email => $bad_mail, group => $groups};
+    $results = {email => $bad_mail, group => $groups, nonce => $nonce};
     $msg = $eu->validate_object($results);
     is($msg, "User not found: $bad_mail", "Validate bad user"); # test 4
 
     $bad_mail = $params{web_master};
-    $results = {email => $bad_mail, group => $groups};
+    $results = {email => $bad_mail, group => $groups, nonce => $nonce};
     $msg = $eu->validate_object($results);
     is($msg, "Cannot change web master groups", "Validate web master"); # test 5
 
     my $bad_groups = [qw(script3)];
-    $results = {email => $email, group => $bad_groups};
+    $results = {email => $email, group => $bad_groups, nonce => $nonce};
     $msg = $eu->validate_object($results);
     is($msg, "Group not found: $bad_groups->[0]", "Validate bad group"); # test 6
 };

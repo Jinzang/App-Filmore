@@ -29,7 +29,10 @@ sub info_object {
     my $groups = $self->read_groups_file();
     my $choices =  join('|', sort keys %$groups);
 
-    my $info = [{name => 'email',
+    my $info = [{name => 'nonce',
+                 type => 'hidden',
+                 valid=>"&int"},
+                {name => 'email',
                  title => 'Email Address',
                  type => 'hidden',
                  valid=>"&email"},
@@ -43,6 +46,8 @@ sub info_object {
 
 sub read_object {
     my ($self, $results) = @_;
+
+    $results->{nonce} = $self->{userdata_ptr}->get_nonce();
     return;
 }
 
@@ -66,7 +71,14 @@ sub template_object {
 
 <form method="post" action="$script_url">
 <!-- for @items -->
-$field
+<!-- if $type eq 'hidden' -->
+<!-- if $name ne 'nonce' -->
+<b>$value</b>
+<!-- endif -->
+<!-- else -->
+<b>$title</b><br />
+<!-- endif -->
+$field<br />
 <!-- endfor -->
 Remove $email?<br/>
 <input type="submit" name="cmd" value="cancel">
@@ -108,6 +120,8 @@ sub validate_object {
 
     my $passwords = $self->{userdata_ptr}->read_password_file();
     return "User not found: $user" unless exists $passwords->{$user};
+
+    return "" if $results->{nonce} ne $self->{userdata_ptr}->get_nonce();
 
     return;
 }

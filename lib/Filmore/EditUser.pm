@@ -60,6 +60,8 @@ sub read_object {
     }
 
     $results->{group} = \@groups;
+    $results->{nonce} = $self->{userdata_ptr}->get_nonce();
+
     return;
 }
 
@@ -84,7 +86,9 @@ sub template_object {
 <form method="post" action="$script_url">
 <!-- for @items -->
 <!-- if $type eq 'hidden' -->
+<!-- if $name ne 'nonce' -->
 <b>$value</b>
+<!-- endif -->
 <!-- else -->
 <b>$title</b><br />
 <!-- endif -->
@@ -133,6 +137,7 @@ sub validate_object {
     }
 
     return "Group not found: " . join(',', @groups) if @groups;
+    return "" if $results->{nonce} ne $self->{userdata_ptr}->get_nonce();
 
     return;
 }
