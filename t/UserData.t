@@ -125,7 +125,7 @@ do {
     my $pass = $ud->random_string(12);
     is(length $pass, 12, "Random password"); # test 7
 
-    $ud->update_password_file($user);
+    $ud->update_password_file($user, $pass);
     my $passwords = $ud->read_password_file();
 
     ok(exists $passwords->{$user}, "Update passwords file"); # test 8

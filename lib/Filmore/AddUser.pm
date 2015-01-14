@@ -4,7 +4,7 @@ use warnings;
 package Filmore::AddUser;
 
 use lib '../../lib';
-use base qw(Filmore::EditUser);
+use base qw(Filmore::ConfiguredObject);
 
 our $VERSION = '0.01';
 
@@ -15,8 +15,58 @@ sub parameters {
     my ($pkg) = @_;
 
     return (
-        userdata_ptr => 'Filmore::UserData'
+        mime_ptr => 'Filmore::MimeMail',
+        userdata_ptr => 'Filmore::UserData',
+        template_ptr => 'Filmore::SimpleTemplate',
     );
+}
+
+#----------------------------------------------------------------------
+# Construct the parts of a mail message
+
+sub build_mail_fields {
+    my ($self, $results) = @_;
+
+    my $template = <<'EOQ';
+You have been added to the list of peope to edit
+the website $base_url. Pleas go to
+
+$script_url?id=$id
+
+to set your password.
+EOQ
+
+    my $mail_fields = {};
+    $mail_fields->{to} = $results->{email};
+    $mail_fields->{from} = $self->{web_master};
+    $mail_fields->{subject} = 'Password change request';
+
+    my $sub = $self->{template_ptr}->construct_code($template);
+    $mail_fields->{body} = &$sub($results);
+
+    return $mail_fields;
+}
+
+#----------------------------------------------------------------------
+# Get the information about data fields
+
+sub info_object {
+    my ($self, $results) = @_;
+
+    my $groups = $self->{userdata_ptr}->read_groups_file();
+    my $choices =  join('|', sort keys %$groups);
+
+    my $info = [{name => 'email',
+                 title => 'Email Address',
+                 type => 'hidden',
+                 valid=>"&email"},
+                {name => 'group',
+                 title => 'Applications',
+                 type => 'checkbox',
+                 valid => "\&string|$choices|"},
+               ];
+
+    return $info;
 }
 
 #----------------------------------------------------------------------
@@ -30,16 +80,61 @@ sub read_object {
 }
 
 #----------------------------------------------------------------------
+# Get the subtemplate used to render the file
+
+sub template_object {
+    my ($self, $results) = @_;
+
+    return <<'EOQ';
+<html>
+<head>
+<!-- section meta -->
+<title>Application Users</title>
+<!-- endsection meta -->
+</head>
+<body>
+<!-- section content -->
+<h1 id="banner">Application Users</h1>
+<p>$error</p>
+
+<form method="post" action="$script_url">
+<!-- for @items -->
+<!-- if $type eq 'hidden' -->
+<!-- if $name ne 'nonce' -->
+<b>$value</b>
+<!-- endif -->
+<!-- else -->
+<b>$title</b><br />
+<!-- endif -->
+$field<br />
+<!-- endfor -->
+<input type="submit" name="cmd" value="cancel">
+<input type="submit" name="cmd" value="$cmd">
+</form>
+<!--endsection content -->
+</body>
+</html>
+EOQ
+}
+
+#----------------------------------------------------------------------
 # Call method to use data gathered from form
 
 sub use_object {
     my ($self, $results) = @_;
 
     my $redirect = 1;
-    $self->{userdata_ptr}->update_password_file($results->{email});
+    my $word = $self->{userdata_ptr}->random_string(12);
+
+    $self->{userdata_ptr}->update_password_file($results->{email},
+                                                $word);
 
     $self->{userdata_ptr}->update_groups_file($results->{email},
                                               $results->{groups});
+
+    my $mail_fields = $self->build_mail_fields($results);
+    $self->{mime_ptr}->send_mail($mail_fields);
+
     return $redirect;
 }
 

@@ -40,14 +40,6 @@ sub info_object {
 }
 
 #----------------------------------------------------------------------
-# No data to read when browsing
-
-sub read_object {
-    my ($self, $results) = @_;
-    return;
-}
-
-#----------------------------------------------------------------------
 # Get the subtemplate used to render the file
 
 sub template_object {
@@ -93,15 +85,6 @@ sub use_object {
 
     my $redirect = 0;
     return $redirect;
-}
-
-#----------------------------------------------------------------------
-# Call method to validate results if it is present
-
-sub validate_object {
-    my ($self, $results) = @_;
-
-    return;
 }
 
 1;

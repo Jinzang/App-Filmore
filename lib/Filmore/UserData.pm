@@ -10,6 +10,7 @@ use Digest::MD5 qw(md5_hex);
 use File::Spec::Functions qw(catfile rel2abs abs2rel splitdir);
 
 our $VERSION = '0.01';
+my $password_cache;
 
 #----------------------------------------------------------------------
 # Set the default parameter values
@@ -19,6 +20,7 @@ sub parameters {
 
     return (
         nonce => 0,
+        extra => '',
         base_directory => '',
         webfile_ptr => 'Filmore::WebFile',
     );
@@ -41,8 +43,16 @@ sub get_nonce {
     my ($self) = @_;
     return $self->{nonce} if $self->{nonce};
 
-    my $nonce = time() / 24000;
-    return md5_hex($(, $nonce, $>);
+    my $nonce = int(time() / 24000);
+    return $self->hash_string($nonce);
+}
+
+#----------------------------------------------------------------------
+# Hash a set of strings into another string
+
+sub hash_string {
+    my ($self, @strings) = @_;
+    return md5_hex($self->{extra}, @strings);
 }
 
 #----------------------------------------------------------------------
@@ -88,21 +98,23 @@ sub read_groups_file {
 sub read_password_file {
     my ($self) = @_;
 
-    my $passwords = {};
-    my $file = catfile($self->{base_directory}, '.htpasswd');
-    my $text = $self->{webfile_ptr}->reader($file);
+    unless ($password_cache) {
+        $password_cache = {};
+        my $file = catfile($self->{base_directory}, '.htpasswd');
+        my $text = $self->{webfile_ptr}->reader($file);
 
-    if ($text) {
-        my @lines = split("\n", $text);
-        foreach (@lines) {
-            my ($user, $password) = split(/\s*:\s*/, $_, 2);
-            next unless $password;
+        if ($text) {
+            my @lines = split("\n", $text);
+            foreach (@lines) {
+                my ($user, $password) = split(/\s*:\s*/, $_, 2);
+                next unless $password;
 
-            $passwords->{$user} = $password;
+                $password_cache->{$user} = $password;
+            }
         }
     }
 
-    return $passwords;
+    return $password_cache;
  }
 
 #----------------------------------------------------------------------
@@ -138,9 +150,8 @@ sub update_groups_file {
 # Generate a new random password for a user
 
 sub update_password_file {
-    my ($self, $user) = @_;
+    my ($self, $user, $word) = @_;
 
-    my $word = $self->random_string(12);
     $word = $self->encrypt($word);
 
     my $passwords = $self->read_password_file();
@@ -166,6 +177,7 @@ sub write_password_file {
     my $file = catfile($self->{base_directory}, '.htpasswd');
     $self->{webfile_ptr}->writer($file, $text);
 
+    undef $password_cache;
     return;
 }
 

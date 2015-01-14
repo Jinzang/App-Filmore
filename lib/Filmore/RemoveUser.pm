@@ -21,6 +21,18 @@ sub parameters {
 }
 
 #----------------------------------------------------------------------
+# Check that the email passed in the request is valid
+
+sub check_id_object {
+    my ($self, $results) = @_;
+
+    my $email = $results->{email};
+    my $passwords = $self->{userdata_ptr}->read_password_file();
+
+    return exists $passwords->{$email};
+}
+
+#----------------------------------------------------------------------
 # Get the information about data fields
 
 sub info_object {

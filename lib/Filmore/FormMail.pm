@@ -16,7 +16,7 @@ use File::Spec::Functions qw(abs2rel catfile rel2abs splitdir);
 
 sub parameters {
     my ($pkg) = @_;
-    
+
     return (
         web_master => '',
         info_extension => 'info',
@@ -68,7 +68,7 @@ sub parse_info {
     my ($self, $text, $id_tags) = @_;
 
     my @lines = split(/\n/, $text);
-    
+
     my @info;
     my $field;
     my %fields;
@@ -78,30 +78,30 @@ sub parse_info {
         if (/^\s*#/) {
             # Comment line
             undef $field;
-            
+
         } elsif (/^\s*\[([^\]]*)\]/) {
             die "Id is not allowed: $1" unless $id_tags;
-            
+
             push(@info, $item) if %$item;
             $item = {};
-            
+
             # new id
             my $id = lc($1);
             $item->{name} = $id;
 
             die "Duplicate id in info file: $id" if $fields{$id};
             $fields{$id} = 1;
-            
+
         } elsif (/^\w+\s*=/) {
             # new field definition
             my $value;
             ($field, $value) = split (/\s*=\s*/, $_, 2);
             $field = lc($field);
             $value =~ s/\s+$//;
-            
+
             die "Missing value for field: $field" unless length $value;
             die "Duplicate field in info file: $field" if exists $item->{$field};
-            
+
             $item->{$field} = $value;
 
         } else {
@@ -109,7 +109,7 @@ sub parse_info {
             die "Undefined field\n" . substr($_, 20) . "\n"
                 unless defined $field;
 
-            s/\s+$//;    
+            s/\s+$//;
             $item->{$field} .= "\n$_";
         }
     }
@@ -123,6 +123,15 @@ sub parse_info {
 }
 
 #----------------------------------------------------------------------
+# Read the data to be displayed (stub)
+
+sub read_object {
+    my ($self, $results) = @_;
+
+    return;
+}
+
+#----------------------------------------------------------------------
 # Return the template used to render the mail message
 
 sub template_object {
@@ -131,7 +140,7 @@ sub template_object {
     my $filename = $self->template_filename($ext);
     my $text = $self->{webfile_ptr}->reader($filename);
     die "Couldn't read template" unless length $text;
-    
+
     return $text;
 }
 
@@ -146,7 +155,7 @@ sub template_filename {
 
     my $template_name = catfile($self->{template_directory},
                                 "$script_base.$ext");
-        
+
     return rel2abs($template_name);
 }
 
@@ -155,10 +164,19 @@ sub template_filename {
 
 sub use_object {
     my ($self, $response) = @_;
-    
+
     my $mail_fields = $self->build_mail_fields($response);
     $self->{mime_ptr}->send_mail($mail_fields);
-    
+
+    return 1;
+}
+
+#----------------------------------------------------------------------
+# Validate mail fields (stub)
+
+sub validate_object {
+    my ($self, $response) = @_;
+
     return 1;
 }
 

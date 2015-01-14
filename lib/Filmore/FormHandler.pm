@@ -50,11 +50,11 @@ sub run {
             if (lc($results->{cmd}) eq 'cancel') {
                 $redirect = 1;
             } elsif ($self->validate_items($results)) {
-                $redirect = $self->use_object($results);
+                $redirect = $self->{code_ptr}->use_object($results);
             }
 
         } else {
-            $self->read_object($results);
+            $self->{code_ptr}->read_object($results);
             $self->update_result_items($results);
         }
     };
@@ -161,7 +161,7 @@ sub build_form {
 
     my @templates;
     push(@templates, $self->{site_template}) if $self->{site_template};
-    push(@templates, $self->template_object($results));
+    push(@templates, $self->{code_ptr}->template_object($results));
 
     # Generate page
 
@@ -185,22 +185,6 @@ sub build_form_fields {
     }
 
     return $results;
-}
-
-#----------------------------------------------------------------------
-# Get the info about the fields to be displayed in the form
-
-sub info_object {
-    my ($self, $results) = @_;
-
-    my $info;
-    if ($self->{code_ptr}->can('info_object')) {
-        $info = $self->{code_ptr}->info_object($results);
-    } else {
-        die "No info about form fields";
-    }
-
-    return $info;
 }
 
 #----------------------------------------------------------------------
@@ -234,35 +218,6 @@ sub parse_validator {
 }
 
 #----------------------------------------------------------------------
-# Read the data to be displayed in the form
-
-sub read_object {
-    my ($self, $results) = @_;
-
-    if ($self->{code_ptr}->can('read_object')) {
-        $self->{code_ptr}->read_object($results);
-    }
-
-    return;
-}
-
-#----------------------------------------------------------------------
-# Get the subtemplate used to render the file
-
-sub template_object {
-    my ($self, $results) = @_;
-
-    my $subtemplate;
-    if ($self->{code_ptr}->can('template_object')) {
-        $subtemplate = $self->{code_ptr}->template_object($results);
-    } else {
-        die "No template data";
-    }
-
-    return $subtemplate;
-}
-
-#----------------------------------------------------------------------
 # Remove leading and trailing whitespace from value
 
 sub trim_value {
@@ -292,20 +247,6 @@ sub update_result_items {
     }
 
     return;
-}
-
-#----------------------------------------------------------------------
-# Call method to use data gathered from form
-
-sub use_object {
-    my ($self, $results) = @_;
-
-    my $redirect;
-    if ($self->{code_ptr}->can('use_object')) {
-        $redirect = $self->{code_ptr}->use_object($results);
-    }
-
-    return $redirect;
 }
 
 #----------------------------------------------------------------------
@@ -518,25 +459,11 @@ sub validate_items {
         push(@message, $msg) if $msg;
     }
 
-    my $msg = $self->validate_object($results);
+    my $msg = $self->{code_ptr}->validate_object($results);
     push(@message, $msg) if defined $msg;
 
     $results->{msg} = join("<br>\n", @message) if @message;
     return @message ? 0 : 1;
-}
-
-#----------------------------------------------------------------------
-# Call method to validate results if it is present
-
-sub validate_object {
-    my ($self, $results) = @_;
-
-    my $msg;
-    if ($self->{code_ptr}->can('validate_object')) {
-        $msg = $self->{code_ptr}->validate_object($results);
-    }
-
-    return $msg;
 }
 
 1;

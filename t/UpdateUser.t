@@ -22,6 +22,7 @@ $lib = catdir(@path, 't');
 unshift(@INC, $lib);
 
 require Filmore::UpdateUser;
+require Filmore::WebFile;
 
 my $base_dir = catdir(@path, 'test');
 
@@ -37,12 +38,27 @@ my %params = (
               );
 
 my $uu = Filmore::UpdateUser->new(%params);
+my $wf = Filmore::WebFile->new(%params);
+
+#----------------------------------------------------------------------
+# Write files
+
+do {
+
+    my $text = <<'EOQ';
+bar@test.com:1d2f3g4s
+foo@test.com:8g4h6j7x
+EOQ
+
+    my $file = catfile($base_dir, '.htpasswd');
+    $wf->write_wo_validation($file, $text);
+};
 
 #----------------------------------------------------------------------
 # Check command selection
 
 do {
-    my $results = {};
+    my $results = {email => 'bar@test.com'};
 
     my $cmd = $uu->get_command($results);
     is($cmd, 'browse_ptr', "No command"); # test 1
@@ -53,5 +69,5 @@ do {
 
     $results->{cmd} = 'remove';
     $cmd = $uu->get_command($results);
-    is($cmd, 'remove_ptr', "Bad command"); # test 3
+    is($cmd, 'remove_ptr', "Good command"); # test 3
 };
