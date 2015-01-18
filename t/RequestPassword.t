@@ -32,6 +32,7 @@ chdir $base_dir;
 $base_dir = getcwd();
 
 my %params = (
+              extra => 'asdfghjk',
               valid_read => [$base_dir],
               web_master => 'poobah@test.com',
               base_directory => $base_dir,
@@ -76,7 +77,7 @@ do  {
 do {
     my $email = 'bar@test.com';
     my $id = $rp->build_id($email);
-    is($id, '6fbd31c51ed09e310cfd4469efb5381f', "Build id string"); # test 3
+    is($id, '9626579227c1fb8401c43682f1990e09', "Build id string"); # test 3
 
 };
 
@@ -93,7 +94,7 @@ A request was made to change the password for the account bar@test.com.
 on the website http://www.test.com. If you did not make this request, ignore
 this message. If you did, go to
 
-http://www.test.com/password.cgi?id=6fbd31c51ed09e310cfd4469efb5381
+http://www.test.com/password.cgi?id=9626579227c1fb8401c43682f1990e09
 
 to change your password.
 EOQ
@@ -101,7 +102,7 @@ EOQ
     my $results = {email => $email,
                    base_url => $base_url,
                    script_url => $script_url,
-                   id => '6fbd31c51ed09e310cfd4469efb5381'};
+                   id => '9626579227c1fb8401c43682f1990e09'};
 
     my $mail_fields = $rp->build_mail_fields($results);
 
