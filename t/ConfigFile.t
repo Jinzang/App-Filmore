@@ -49,8 +49,7 @@ close($io);
 
 my $cf = Filmore::ConfigFile->new(config_file => $config_file);
 
-my $configuration = {};
-$cf->read_file($configuration);
+my $configuration = $cf->read_file($config_file);
 
 my $configuration_result = {
                             one => 1,
@@ -59,8 +58,7 @@ my $configuration_result = {
 
 is_deeply($configuration, $configuration_result, "Read file"); #test 1
 
-$cf->write_file($configuration_result);
+$cf->write_file($config_file, $configuration_result);
+$configuration = $cf->read_file($config_file);
 
-$configuration = {};
-$cf->read_file($configuration);
 is_deeply($configuration, $configuration_result, "Write file"); # test 2

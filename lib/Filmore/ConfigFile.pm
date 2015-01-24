@@ -15,7 +15,7 @@ our $VERSION = '0.01';
 
 sub new {
 	my ($pkg, %configuration) = @_;
-    
+
     my $self = bless({}, $pkg);
 	$self->populate_object(\%configuration);
 
@@ -34,76 +34,176 @@ sub parameters {
 }
 
 #----------------------------------------------------------------------
+# Get field's value from a hash
+
+sub get_field {
+    my ($self, $hash, $name) = @_;
+
+    while ($name =~ /\./) {
+        my $subname;
+        ($name, $subname) = split(/\./, $name, 2);
+        last unless exists $hash->{$name};
+
+        $hash = $hash->{$name};
+        $name = $subname;
+    }
+
+    my $value = exists $hash->{$name} ? $hash->{$name} : '';
+    return $value;
+}
+
+#----------------------------------------------------------------------
+# Build include file name
+
+sub include_file {
+    my ($self, $filename) = @_;
+
+    my @path = splitdir($self->{config_file});
+    pop @path;
+
+    $filename = catfile(@path, $filename);
+    return $filename;
+}
+
+#----------------------------------------------------------------------
 # Set the field values in a new object
 
 sub populate_object {
 	my ($self, $configuration) = @_;
 
     $self->SUPER::populate_object($configuration);
-    $self->read_file($configuration);
-    
+    my $hash = $self->read_file($self->{config_file});
+    %$configuration = (%$hash, %$configuration);
+
     return;
 }
 
-#----------------------------------------------------------------------
+#---------------------------------------------------------------------------
 # Read a configuration file into a hash
 
 sub read_file {
-    my ($self, $configuration) = @_;
+    my ($self, $filename) = @_;
 
-    return unless $self->{config_file} && -e $self->{config_file};
-    
-    my $fd = IO::File->new($self->{config_file}, 'r');
-    die "Couln't read $self->{config_file}: $!" unless $fd;
-    
-    while (my $line = <$fd>) {
-        # Ignore comments and blank lines
-        next if $line =~ /^\s*\#/ || $line !~ /\S/;
+    my $hash = {};
+    my $fd = IO::File->new($filename, 'r');
 
-        # Split line into name and value, remove leading and
-        # trailing whitespace
+    if ($fd) {
+        while (my $line = <$fd>) {
+            # Ignore comments and blank lines
+            next if $line =~ /^\s*\#/ || $line !~ /\S/;
 
-        my ($name, $value) = split (/\s*=\s*/, $line, 2);
-        die "Bad line in config file: ($name)" unless defined $value;
+            if ($line =~ /=/) {
+                # Split line into name and value, remove leading and
+                # trailing whitespace
 
-        $value =~ s/\s+$//;
-        if (! exists $configuration->{$name}) {
-            $configuration->{$name} = $value;
+                my ($name, $value) = split (/\s*=\s*/, $line, 2);
 
-        } elsif (ref $configuration->{$name} eq 'ARRAY') {
-            push(@{$configuration->{$name}}, $value);
+                die "Bad line in config file: ($name)" unless defined $value;
+                $value =~ s/\s+$//;
+
+                # Insert the name and value into the hash
+
+                $self->set_field($hash, $name, $value);
+
+            } else {
+                # Lines without equal signs are commands
+                my ($cmd, $arg) = split(' ', $line, 2);
+
+                if ($cmd eq 'include') {
+                    # Include file
+                    $filename = $self->include_file($arg);
+                    my $subhash = $self->read_file($filename);
+                    %$hash = (%$hash, %$subhash);
+
+                } else {
+                    die "Unrecognized command in config file: $cmd";
+                }
+            }
+        }
+
+        close($fd);
+    }
+
+    return $hash;
+}
+
+#---------------------------------------------------------------------------
+# Insert a field's name and value into a hash
+
+sub set_field {
+    my ($self, $hash, $name, $value) = @_;
+
+    $value =~ s/\${([\w\.]+)}/$self->get_field($hash, $1)/ge;
+    $value =~ s/\$([\w\.]+)/$self->get_field($hash, $1)/ge;
+
+    while ($name =~ /\./) {
+        my $subname;
+        ($name, $subname) = split(/\./, $name, 2);
+        $hash->{$name} = {} unless exists $hash->{$name};
+
+        $hash = $hash->{$name};
+        $name = $subname;
+    }
+
+    if (! exists $hash->{$name}) {
+        $hash->{$name} = $value;
+
+    } elsif (ref $hash->{$name} eq 'ARRAY') {
+        push(@{$hash->{$name}}, $value);
+
+    } elsif (ref $hash->{$name} eq 'HASH') {
+        die "Name colision in configuration file: ($name)\n";
+
+    } else {
+        $hash->{$name} = [$hash->{$name}, $value];
+    }
+
+    return;
+}
+
+#---------------------------------------------------------------------------
+# Convert data structure to string
+
+sub write_fields {
+    my ($self, $hash, $prefix) = @_;
+
+    my @output;
+    foreach my $name (sort keys %$hash) {
+        next if $name =~ /_ptr$/;
+
+        my $value = $hash->{$name};
+        my $longname = defined $prefix ? "$prefix.$name" : $name;
+
+        if (! ref $value) {
+            push(@output, "$longname = $value\n");
+
+        } elsif (ref $hash->{$name} eq 'ARRAY') {
+            foreach my $subvalue (@{$hash->{$name}}) {
+                push(@output, "$longname = $subvalue\n");
+            }
+
+        } elsif (ref $hash->{$name} eq 'HASH') {
+            push(@output, $self->write_fields($hash->{$name}, $longname));
 
         } else {
-            $configuration->{$name} = [$configuration->{$name}, $value];
+            die " Can't write value to config file: $longname\n";
         }
     }
 
-    close($fd);
-    return;
+    return @output;
 }
 
 #----------------------------------------------------------------------
 # Write a configuration file from a hash
 
 sub write_file {
-    my ($self, $configuration) = @_;
+    my ($self, $filename, $configuration) = @_;
 
-    die "Configuration file undefined" unless $self->{config_file};
-    
-    my $fd = IO::File->new($self->{config_file}, 'w');
-    die "Couln't read $self->{config_file}: $!" unless $fd;
-    
-    my $pkg = ref $self;
-    my %parameters = $pkg->parameters();
-    
-    foreach my $name (sort keys %$configuration) {
-        next if exists $parameters{$name};
+    my $fd = IO::File->new($filename, 'w');
+    die "Couln't read $filename: $!" unless $fd;
 
-        my $value = $configuration->{$name};
-        $value = ref $value if ref $value;
-        
-        print $fd "$name = $value\n";
-    }
+    my @output = $self->write_fields($configuration);
+    print $fd join("\n", @output), "\n";
 
     close($fd);
     return;
@@ -119,8 +219,9 @@ Filmore::ConfigFile reads and writes configuration files
 =head1 SYNOPSIS
 
 	use Filmore::ConfigFile;
-    $obj = Filmore::ConfigFile->new(config_file => 'example.cfg');
-    my $configuration = $obj->read_file();
+    my $obj = Filmore::ConfigFile->new(config_file => 'example.cfg');
+    my $configuration = {};
+    $obj->read_file($configuration);
     $obj->write_file($configuration);
 
 =head1 DESCRIPTION
@@ -133,7 +234,9 @@ Configuration file lines are organized as lines containing
 
 and may contain blank lines or comment lines starting with a C<#>. The
 ConfguredObject class reads a configuration file to override default
-parameter values. 
+parameter values.
+
+##TODO complete description
 
 =head1 AUTHOR
 
