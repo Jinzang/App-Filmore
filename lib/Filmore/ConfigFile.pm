@@ -6,7 +6,9 @@ package Filmore::ConfigFile;
 
 use lib '../../lib';
 use base qw(Filmore::ConfiguredObject);
+
 use IO::File;
+use File::Spec::Functions qw(catdir catfile rel2abs splitdir);
 
 our $VERSION = '0.01';
 
@@ -107,6 +109,7 @@ sub read_file {
 
             } else {
                 # Lines without equal signs are commands
+                $line =~ s/\s+$//;
                 my ($cmd, $arg) = split(' ', $line, 2);
 
                 if ($cmd eq 'include') {
@@ -236,7 +239,16 @@ and may contain blank lines or comment lines starting with a C<#>. The
 ConfguredObject class reads a configuration file to override default
 parameter values.
 
-##TODO complete description
+If a name is repeated in the configuration file, the values are treated
+as an array of values. A name can also contain one or more dots. If it
+does, the value is treated like a hash, where the first part of the name
+isthe nameof the hash and the second part the name of the field in the
+hash.
+
+If a line does not have an equals sign, it is a command. The first word
+is the command name and the remaining words are arguments. Only one
+command is currently supported, the include command, which includes
+the text of another file as if it were part of the configuration file.
 
 =head1 AUTHOR
 
