@@ -7,10 +7,13 @@ package Filmore::ConfigFile;
 use lib '../../lib';
 use base qw(Filmore::ConfiguredObject);
 
+our $VERSION = '0.01';
+
 use IO::File;
 use File::Spec::Functions qw(catdir catfile rel2abs splitdir);
 
-our $VERSION = '0.01';
+use constant CONFIG_EXT => 'cfg';
+use constant INCLUDE_EXT => 'inc';
 
 #----------------------------------------------------------------------
 # Create new object, configure fields, and create subobjects recursively
@@ -31,7 +34,7 @@ sub parameters {
 	my ($pkg) = @_;
 
 	return (
-			config_file => '',
+			config_dir => 'config',
 		   );
 }
 
@@ -55,15 +58,26 @@ sub get_field {
 }
 
 #----------------------------------------------------------------------
-# Build include file name
+# Get the name of a configuration file
 
-sub include_file {
-    my ($self, $filename) = @_;
+sub get_filename {
+    my ($self, $ext, $filename) = @_;
 
-    my @path = splitdir($self->{config_file});
-    pop @path;
+    $ext = CONFIG_EXT unless defined $ext;
 
-    $filename = catfile(@path, $filename);
+    unless (defined $filename) {
+        my @path = splitdir($0);
+        $filename = pop(@path);
+        $filename =~ s/\.[^\.]*$//;
+    }
+
+    my ($basename) = $filename =~ /^([-\w]+)$/;
+    die "Illegal config file name: $filename\n" unless $basename;
+    $filename = join('.', $basename, $ext);
+
+    $filename = catfile($self->{config_dir}, $filename);
+    $filename = rel2abs($filename);
+
     return $filename;
 }
 
@@ -74,9 +88,11 @@ sub populate_object {
 	my ($self, $configuration) = @_;
 
     $self->SUPER::populate_object($configuration);
-    my $hash = $self->read_file($self->{config_file});
-    %$configuration = (%$hash, %$configuration);
 
+    my $filename =$self->get_filename();
+    my $hash = $self->read_file($filename);
+
+    %$configuration = (%$hash, %$configuration);
     return;
 }
 
@@ -110,11 +126,11 @@ sub read_file {
             } else {
                 # Lines without equal signs are commands
                 $line =~ s/\s+$//;
-                my ($cmd, $arg) = split(' ', $line, 2);
+                my ($cmd, $arg) = split(' ', $line);
 
                 if ($cmd eq 'include') {
                     # Include file
-                    $filename = $self->include_file($arg);
+                    $filename = $self->get_filename(INCLUDE_EXT, $arg);
                     my $subhash = $self->read_file($filename);
                     %$hash = (%$hash, %$subhash);
 
