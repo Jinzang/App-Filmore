@@ -1,0 +1,9 @@
+email.title = Email Address
+email.type = hidden
+email.valid= &email
+email.order = 1
+
+group.title = Applications
+group.type = checkbox
+group.valid = &string
+group.order = 2

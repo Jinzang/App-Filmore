@@ -1,0 +1,5 @@
+email.title = Email Address
+email.type = radio
+email.style = linebreak=1
+email.valid = &string
+email.order = 1

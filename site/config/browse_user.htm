@@ -1,0 +1,28 @@
+<html>
+<head>
+<!-- section meta -->
+<title>Application Users</title>
+<!-- endsection meta -->
+</head>
+<body>
+<!-- section content -->
+<h1 id="banner">Application Users</h1>
+<p>$error</p>
+
+<form method="post" action="$script_url">
+<b>Add New User</b><br/>
+<input type="submit" name="cmd" value="add">
+</form>
+
+<form method="post" action="$script_url">
+<!-- for @items -->
+<b>$title</b><br />
+$field<br />
+<!-- endfor -->
+<input type="submit" name="cmd" value="cancel">
+<input type="submit" name="cmd" value="edit">
+<input type="submit" name="cmd" value="remove">
+</form>
+<!--endsection content -->
+</body>
+</html>
