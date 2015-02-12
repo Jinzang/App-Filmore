@@ -20,7 +20,6 @@ sub parameters {
 
     return (
         nonce => 0,
-        extra => '',
         base_directory => '',
         webfile_ptr => 'Filmore::WebFile',
     );
@@ -37,22 +36,11 @@ sub encrypt {
 }
 
 #----------------------------------------------------------------------
-# Create the nonce for validated form input
-
-sub get_nonce {
-    my ($self) = @_;
-    return $self->{nonce} if $self->{nonce};
-
-    my $nonce = int(time() / 24000);
-    return $self->hash_string($nonce);
-}
-
-#----------------------------------------------------------------------
 # Hash a set of strings into another string
 
 sub hash_string {
     my ($self, @strings) = @_;
-    return md5_hex($self->{extra}, @strings);
+    return md5_hex($(, @strings, $>);
 }
 
 #----------------------------------------------------------------------

@@ -1,11 +1,5 @@
-# Field information for rmove users form
-
-nonce.type = hidden
-nonce.valid = &int
-nonce.order = 1
-
-email.name = email
-email.title = Email Address
-email.type = hidden
-email.valid= &email
-email.order = 2
+# RemoveUsers form fields
+name = email
+title = Email Address
+type = hidden
+valid = &email

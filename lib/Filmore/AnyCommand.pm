@@ -8,7 +8,8 @@ use base qw(Filmore::ConfiguredObject);
 
 our $VERSION = '0.01';
 
-use constant DEFAULT_CMD => 'browse';
+use constant INFO_EXT => 'info';
+use constant TEMPLATE_EXT => 'htm';
 
 #----------------------------------------------------------------------
 # Set the default parameter values
@@ -17,8 +18,24 @@ sub parameters {
     my ($pkg) = @_;
 
     return (
-        default_cmd => '',
+        config_ptr => 'Filmore::ConfigFile',
+        webfile_ptr => 'Filmore::WebFile',
      );
+}
+
+#----------------------------------------------------------------------
+# Convert the command pointer name to a configuration file name
+
+sub configuration_name {
+    my ($self, $cmd) = @_;
+
+    my @config = split('::', ref($self->{$cmd}));
+    my $config = pop @config;
+
+    $config =~ s/([A-Z])/'_' . lc($1)/eg;
+    $config =~ s/^_//;
+
+    return $config;
 }
 
 #----------------------------------------------------------------------
@@ -59,9 +76,22 @@ sub info_object {
 
     if ($self->{$cmd}->can('info_object')) {
         $info = $self->{$cmd}->info_object($results);
+
     } else {
-        die "No info about form fields";
+        my $base = $self->configuration_name($cmd);
+        my $filename = $self->{config_ptr}->get_filename(INFO_EXT, $base);
+        my @info = $self->{config_ptr}->read_file($filename);
+        $info = \@info;
     }
+
+    my $nonce_info = {name => 'nonce',
+                      type=> 'hidden',
+                      valid => '&nonce',
+                      msg => 'Time outerror, please resubmit',
+                      };
+
+    $nonce_info->{value} = $self->{webfile_ptr}->get_nonce();
+    unshift(@$info, $nonce_info);
 
     return $info;
 }
@@ -92,7 +122,13 @@ sub template_object {
     if ($self->{$cmd}->can('template_object')) {
         $subtemplate = $self->{$cmd}->template_object($results);
     } else {
-        die "No template data";
+        my $fd;
+        my $base = $self->configuration_name($cmd);
+        my $filename= $self->{config_ptr}->get_filename(TEMPLATE_EXT, $base);
+
+        $fd = IO::File->new($filename, 'r') or die "$!: $filename\n";
+        $subtemplate = do {local $/; <$fd>};
+        close($fd);
     }
 
     return $subtemplate;

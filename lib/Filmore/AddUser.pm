@@ -8,6 +8,8 @@ use base qw(Filmore::ConfiguredObject);
 
 our $VERSION = '0.01';
 
+use constant INFO_EXT => 'info';
+
 #----------------------------------------------------------------------
 # Set the default parameter values
 
@@ -16,6 +18,7 @@ sub parameters {
 
     return (
         mime_ptr => 'Filmore::MimeMail',
+        config_ptr => 'Filmore::ConfigFile',
         userdata_ptr => 'Filmore::UserData',
         template_ptr => 'Filmore::SimpleTemplate',
     );
@@ -53,20 +56,19 @@ EOQ
 sub info_object {
     my ($self, $results) = @_;
 
+    my $filename = $self->{config_ptr}->get_filename(INFO_EXT, 'add_user');
+    my @info = $self->{config_ptr}->read_file($filename);
+
     my $groups = $self->{userdata_ptr}->read_groups_file();
     my $choices =  join('|', sort keys %$groups);
 
-    my $info = [{name => 'email',
-                 title => 'Email Address',
-                 type => 'hidden',
-                 valid=>"&email"},
-                {name => 'group',
-                 title => 'Applications',
-                 type => 'checkbox',
-                 valid => "\&string|$choices|"},
-               ];
+    foreach my $item (@info) {
+        if ($item->{name} eq 'group') {
+            $item->{valid} = "\&string|$choices|";
+        }
+    }
 
-    return $info;
+    return \@info;
 }
 
 #----------------------------------------------------------------------
@@ -77,44 +79,6 @@ sub read_object {
 
     $results->{nonce} = $self->{userdata_ptr}->get__nonce();
     return;
-}
-
-#----------------------------------------------------------------------
-# Get the subtemplate used to render the file
-
-sub template_object {
-    my ($self, $results) = @_;
-
-    return <<'EOQ';
-<html>
-<head>
-<!-- section meta -->
-<title>Application Users</title>
-<!-- endsection meta -->
-</head>
-<body>
-<!-- section content -->
-<h1 id="banner">Application Users</h1>
-<p>$error</p>
-
-<form method="post" action="$script_url">
-<!-- for @items -->
-<!-- if $type eq 'hidden' -->
-<!-- if $name ne 'nonce' -->
-<b>$value</b>
-<!-- endif -->
-<!-- else -->
-<b>$title</b><br />
-<!-- endif -->
-$field<br />
-<!-- endfor -->
-<input type="submit" name="cmd" value="cancel">
-<input type="submit" name="cmd" value="$cmd">
-</form>
-<!--endsection content -->
-</body>
-</html>
-EOQ
 }
 
 #----------------------------------------------------------------------
@@ -155,9 +119,7 @@ sub validate_object {
     foreach my $group (@{$results->{group}}) {
         push(@groups, $group) unless exists $groups{$group};
     }
-
     return "Group not found: " . join(',', @groups) if @groups;
-    return "" if $results->{nonce} ne $self->{userdata_ptr}->get_nonce();
 
     return;
 }

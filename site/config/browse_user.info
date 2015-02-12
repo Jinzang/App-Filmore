@@ -1,5 +1,6 @@
-email.title = Email Address
-email.type = radio
-email.style = linebreak=1
-email.valid = &string
-email.order = 1
+# BrowseUser form fields
+name = email
+title = Email Address
+type = radio
+style = linebreak=1
+valid = &string

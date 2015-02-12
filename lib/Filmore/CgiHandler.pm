@@ -58,6 +58,7 @@ sub parameters {
     return (
             base_directory => '',
             base_url => '',
+            protect => 0,
             detail_errors => 1,
             protocol => 'text/html',
             form_ptr => 'Filmore::FormHandler',
@@ -75,9 +76,14 @@ sub run {
     eval {
         $request = $self->request($args);
         $response = Filmore::Response->new;
-        $response = $self->response($request, $response);
+
+        if ($self->authorize($request)) {
+            $response = $self->response($request, $response);
+        } else {
+            $response->code(401);
+        }
     };
-    
+
     if ($@) {
         $response->content($self->error($request, $@));
         $response->code(200);
@@ -92,19 +98,39 @@ sub run {
 
 sub add_urls {
     my ($self, $request) = @_;
-    
+
     if ($self->{base_url}) {
         $request->{base_url} = $self->{base_url};
         $request->{base_url} =~ s/\/$//;
     } else {
         $request->{base_url} = '';
     }
-    
+
     my $path = rel2abs($0);
     $request->{script_url} ||=
         $self->{webfile_ptr}->filename_to_url($path, $request->{base_url});
 
+    if (exists $ENV{REMOTE_URL}) {
+        $request->{remote_url} = $ENV{REMOTE_URL};
+    }
+
     return $request;
+}
+
+#----------------------------------------------------------------------
+# Check to see if we have an authorized user if the task requires it
+
+sub authorize {
+    my ($self, $request) = @_;
+
+    my $checked;
+    if ($self->{protect}) {
+        $checked  = exists $request->{remote_user};
+    } else{
+        $checked = 1;
+    }
+
+    return $checked;
 }
 
 #----------------------------------------------------------------------
@@ -167,7 +193,7 @@ sub error {
 
 sub redirect {
     my ($self, $request, $response) = @_;
-    
+
     my $cgi = CGI->new();
     my $url = $response->{url} || $request->{referer_url};
     print $cgi->redirect($url);
@@ -255,7 +281,7 @@ sub response {
 # Stringify response and print to stdout
 
 sub send_response {
-    my ($self, $response) = @_;    
+    my ($self, $response) = @_;
 
     my $code = $response->code;
     my $response_msg = RESPONSE_MSG;
@@ -263,7 +289,7 @@ sub send_response {
 
     print "HTTP/1.0 $code $msg\r\n";
     print "Content-type: $self->{protocol}\r\n";
-    
+
     $response->header('Content_Length', length($self->content)) if $self->content;
     my $header = $response->header;
 
@@ -276,7 +302,7 @@ sub send_response {
 
     print "\r\n";
     print $response->content if $response->content;
-    
+
     return;
 }
 

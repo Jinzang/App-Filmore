@@ -25,16 +25,18 @@ require Filmore::ConfigFile;
 require MinMax;
 
 my $base_dir = catdir(@path, 'test');
+my $config_dir = catdir(@path, 'test', 'config');
 
 rmtree($base_dir);
 mkdir $base_dir;
+mkdir $config_dir;
 chdir $base_dir;
 $base_dir = getcwd();
 
-my $config_file = "$base_dir/config.cfg";
+my $config_file = catfile($config_dir, 'config.cfg');
 
 my %parameters = (
-    config_file => $config_file,
+    config_dir => $config_dir,
     min => 1,
     max => 10,
 );
@@ -43,17 +45,16 @@ my %parameters = (
 # Test new
 
 my $cf = Filmore::ConfigFile->new(%parameters);
-$cf->write_file(\%parameters);
+$cf->write_file($config_file, \%parameters);
 
 can_ok($cf, qw(new parameters)); #test 1
 
 #----------------------------------------------------------------------
 # Test create new object from config file
 
-my $mm = MinMax->new(config_file => $config_file);
+my $mm = MinMax->new(config_dir => $config_dir);
 
 is($mm->{min}, $parameters{min}, "Minmax min"); #test 2
 is($mm->{max}, $parameters{max}, "Minmax max"); #test 3
-is($mm->{config_ptr}{config_file}, $parameters{config_file},
+is($mm->{config_ptr}{config_dir}, $parameters{config_dir},
    "Config file"); # test 4
-

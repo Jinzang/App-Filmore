@@ -8,6 +8,8 @@ use base qw(Filmore::ConfiguredObject);
 
 our $VERSION = '0.01';
 
+use constant INFO_EXT => 'info';
+
 #----------------------------------------------------------------------
 # Set the default parameter values
 
@@ -16,6 +18,7 @@ sub parameters {
 
     return (
         web_master => '',
+        config_ptr => 'Filmore::ConfigFile',
         userdata_ptr => 'Filmore::UserData',
     );
 }
@@ -26,55 +29,21 @@ sub parameters {
 sub info_object {
     my ($self, $results) = @_;
 
+    my $filename = $self->{config_ptr}->get_filename(INFO_EXT, 'browse_user');
+    my @info = $self->{config_ptr}->read_file($filename);
+
     my $passwords = $self->{userdata_ptr}->read_password_file();
     delete $passwords->{$self->{web_master}};
 
     my $users = join('|', sort keys %$passwords);
 
-    my $info = [{name => 'email',
-                 title => 'Email Address',
-                 type => 'radio',
-                 style => 'linebreak=1',
-                 valid => "\&string|$users|"}];
-    return $info;
-}
+    foreach my $item (@info) {
+        if ($item->{name} eq 'email') {
+            $item->{valid} = "\&string|$users|";
+        }
+    }
 
-#----------------------------------------------------------------------
-# Get the subtemplate used to render the file
-
-sub template_object {
-    my ($self, $results) = @_;
-
-    return <<'EOQ';
-<html>
-<head>
-<!-- section meta -->
-<title>Application Users</title>
-<!-- endsection meta -->
-</head>
-<body>
-<!-- section content -->
-<h1 id="banner">Application Users</h1>
-<p>$error</p>
-
-<form method="post" action="$script_url">
-<b>Add New User</b><br/>
-<input type="submit" name="cmd" value="add">
-</form>
-
-<form method="post" action="$script_url">
-<!-- for @items -->
-<b>$title</b><br />
-$field<br />
-<!-- endfor -->
-<input type="submit" name="cmd" value="cancel">
-<input type="submit" name="cmd" value="edit">
-<input type="submit" name="cmd" value="remove">
-</form>
-<!--endsection content -->
-</body>
-</html>
-EOQ
+    return \@info;
 }
 
 #----------------------------------------------------------------------

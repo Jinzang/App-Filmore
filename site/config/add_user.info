@@ -1,9 +1,10 @@
-email.title = Email Address
-email.type = hidden
-email.valid= &email
-email.order = 1
+# AddUser form fields
+name = email
+title = Email Address
+type = hidden
+valid= &email
 
-group.title = Applications
-group.type = checkbox
-group.valid = &string
-group.order = 2
+name = group
+title = Applications
+type = checkbox
+valid = &string

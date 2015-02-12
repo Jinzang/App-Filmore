@@ -39,22 +39,18 @@ sub parameters {
 }
 
 #----------------------------------------------------------------------
-# Get field's value from a hash
+# Combine an array of hashes into a single hash
 
-sub get_field {
-    my ($self, $hash, $name) = @_;
+sub combine_hashes {
+    my ($self, @array) = @_;
 
-    while ($name =~ /\./) {
-        my $subname;
-        ($name, $subname) = split(/\./, $name, 2);
-        last unless exists $hash->{$name};
+    my $config = shift(@array) || {};
 
-        $hash = $hash->{$name};
-        $name = $subname;
+    while (@array) {
+        %$config = (%$config, %{shift @array});
     }
 
-    my $value = exists $hash->{$name} ? $hash->{$name} : '';
-    return $value;
+    return $config;
 }
 
 #----------------------------------------------------------------------
@@ -90,9 +86,10 @@ sub populate_object {
     $self->SUPER::populate_object($configuration);
 
     my $filename =$self->get_filename();
-    my $hash = $self->read_file($filename);
+    my @array = $self->read_file($filename);
+    my $config = $self->combine_hashes(@array);
 
-    %$configuration = (%$hash, %$configuration);
+    %$configuration = (%$config, %$configuration);
     return;
 }
 
@@ -102,111 +99,92 @@ sub populate_object {
 sub read_file {
     my ($self, $filename) = @_;
 
+    my @data = ();
     my $hash = {};
-    my $fd = IO::File->new($filename, 'r');
+    my $field = '';
+    my $fd = IO::File->new($filename, "r");
 
+    my $n = 0;
     if ($fd) {
+        $n ++;
         while (my $line = <$fd>) {
-            # Ignore comments and blank lines
-            next if $line =~ /^\s*\#/ || $line !~ /\S/;
-
-            if ($line =~ /=/) {
-                # Split line into name and value, remove leading and
-                # trailing whitespace
-
-                my ($name, $value) = split (/\s*=\s*/, $line, 2);
-
-                die "Bad line in config file: ($name)" unless defined $value;
-                $value =~ s/\s+$//;
-
-                # Insert the name and value into the hash
-
-                $self->set_field($hash, $name, $value);
-
-            } else {
-                # Lines without equal signs are commands
+            if ($line =~/\S/) {
                 $line =~ s/\s+$//;
-                my ($cmd, $arg) = split(' ', $line);
 
-                if ($cmd eq 'include') {
-                    # Include file
-                    $filename = $self->get_filename(INCLUDE_EXT, $arg);
-                    my $subhash = $self->read_file($filename);
-                    %$hash = (%$hash, %$subhash);
+                if ($line =~ /^\s+/) {
+                    die "Indentation error in $filename on line $n\n"
+                        unless length $field;
+
+                    $line =~ s/^\s+/\n/;
+                    $hash->{$field} .= $line;
+
+                } elsif ($line =~ /^#/) {
+                    $field = '';
+
+                } elsif ($line =~ /=/) {
+                    my $value;
+                    ($field, $value) = split(/\s*=\s*/, $line, 2);
+                    $hash->{$field} = $value;
 
                 } else {
-                    die "Unrecognized command in config file: $cmd";
+                    my ($cmd, $arg) = split(' ', $line, 2);
+                    if ($cmd eq 'include') {
+                        # Include file
+                        push(@data, $hash) if %$hash;
+
+                        $filename = $self->get_filename(INCLUDE_EXT, $arg);
+                        my @subarray = $self->read_file($filename);
+                        $hash = $self->combine_hashes(@subarray);
+
+                        push(@data, $hash);
+                        $hash = {};
+
+                    } else {
+                        die "Indentation error in $filename on line $n\n";
+                    }
                 }
+
+            } elsif (%$hash) {
+                push(@data, $hash);
+                $field = '';
+                $hash = {};
             }
         }
 
         close($fd);
     }
 
-    return $hash;
-}
-
-#---------------------------------------------------------------------------
-# Insert a field's name and value into a hash
-
-sub set_field {
-    my ($self, $hash, $name, $value) = @_;
-
-    $value =~ s/\${([\w\.]+)}/$self->get_field($hash, $1)/ge;
-    $value =~ s/\$([\w\.]+)/$self->get_field($hash, $1)/ge;
-
-    while ($name =~ /\./) {
-        my $subname;
-        ($name, $subname) = split(/\./, $name, 2);
-        $hash->{$name} = {} unless exists $hash->{$name};
-
-        $hash = $hash->{$name};
-        $name = $subname;
-    }
-
-    if (! exists $hash->{$name}) {
-        $hash->{$name} = $value;
-
-    } elsif (ref $hash->{$name} eq 'ARRAY') {
-        push(@{$hash->{$name}}, $value);
-
-    } elsif (ref $hash->{$name} eq 'HASH') {
-        die "Name colision in configuration file: ($name)\n";
-
-    } else {
-        $hash->{$name} = [$hash->{$name}, $value];
-    }
-
-    return;
+    push(@data, $hash) if %$hash;
+    return @data;
 }
 
 #---------------------------------------------------------------------------
 # Convert data structure to string
 
 sub write_fields {
-    my ($self, $hash, $prefix) = @_;
+    my ($self, $data, $name) = @_;
 
     my @output;
-    foreach my $name (sort keys %$hash) {
-        next if $name =~ /_ptr$/;
+    my $ref = ref $data;
 
-        my $value = $hash->{$name};
-        my $longname = defined $prefix ? "$prefix.$name" : $name;
+    if (defined $name) {
+        die "Can't write a $ref\n" if $ref;
 
-        if (! ref $value) {
-            push(@output, "$longname = $value\n");
+        $data =~ s/\n/\n    /g;
+        push(@output, "$name = $data");
 
-        } elsif (ref $hash->{$name} eq 'ARRAY') {
-            foreach my $subvalue (@{$hash->{$name}}) {
-                push(@output, "$longname = $subvalue\n");
-            }
-
-        } elsif (ref $hash->{$name} eq 'HASH') {
-            push(@output, $self->write_fields($hash->{$name}, $longname));
-
-        } else {
-            die " Can't write value to config file: $longname\n";
+    } elsif ($ref eq 'ARRAY') {
+        foreach my $subdata (@$data) {
+            push(@output, $self->write_fields($subdata));
         }
+
+    } elsif ($ref eq 'HASH') {
+        foreach my $name (sort keys %$data) {
+            push(@output, $self->write_fields($data->{$name}, $name));
+        }
+
+    } else {
+        die "Can't write a $ref\n";
     }
 
     return @output;
@@ -216,12 +194,12 @@ sub write_fields {
 # Write a configuration file from a hash
 
 sub write_file {
-    my ($self, $filename, $configuration) = @_;
+    my ($self, $filename, $data) = @_;
 
     my $fd = IO::File->new($filename, 'w');
-    die "Couln't read $filename: $!" unless $fd;
+    die "Couln't write $filename: $!" unless $fd;
 
-    my @output = $self->write_fields($configuration);
+    my @output = $self->write_fields($data);
     print $fd join("\n", @output), "\n";
 
     close($fd);
@@ -255,11 +233,8 @@ and may contain blank lines or comment lines starting with a C<#>. The
 ConfguredObject class reads a configuration file to override default
 parameter values.
 
-If a name is repeated in the configuration file, the values are treated
-as an array of values. A name can also contain one or more dots. If it
-does, the value is treated like a hash, where the first part of the name
-isthe nameof the hash and the second part the name of the field in the
-hash.
+If subsequent lines are indented, they are considered part of the previous
+line.
 
 If a line does not have an equals sign, it is a command. The first word
 is the command name and the remaining words are arguments. Only one

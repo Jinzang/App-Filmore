@@ -77,7 +77,7 @@ do  {
 do {
     my $email = 'bar@test.com';
     my $id = $rp->build_id($email);
-    is($id, '9626579227c1fb8401c43682f1990e09', "Build id string"); # test 3
+    is($id, 'b9e7abb620f04132751e681d3ea4f4b6', "Build id string"); # test 3
 
 };
 
@@ -94,7 +94,7 @@ A request was made to change the password for the account bar@test.com.
 on the website http://www.test.com. If you did not make this request, ignore
 this message. If you did, go to
 
-http://www.test.com/password.cgi?id=9626579227c1fb8401c43682f1990e09
+http://www.test.com/password.cgi?id=b9e7abb620f04132751e681d3ea4f4b6
 
 to change your password.
 EOQ
@@ -102,7 +102,7 @@ EOQ
     my $results = {email => $email,
                    base_url => $base_url,
                    script_url => $script_url,
-                   id => '9626579227c1fb8401c43682f1990e09'};
+                   id => 'b9e7abb620f04132751e681d3ea4f4b6'};
 
     my $mail_fields = $rp->build_mail_fields($results);
 

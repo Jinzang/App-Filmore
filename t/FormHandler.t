@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 use strict;
 
-use Test::More tests => 47;
+use Test::More tests => 50;
 
 use Cwd;
 use IO::File;
@@ -32,7 +32,7 @@ chdir $base_dir;
 $base_dir = getcwd();
 
 my $config_file = "$base_dir/config.cfg";
-my $fh = Filmore::FormHandler->new(code_ptr => 'MinMax');
+my $fh = Filmore::FormHandler->new(code_ptr => 'MinMax', nonce => 707);
 
 #----------------------------------------------------------------------
 # Create object
@@ -238,23 +238,40 @@ do {
 };
 
 do {
+    my $item = {valid => '&nonce'};
+    my $item_ok = {valid => '&nonce', datatype => 'nonce',
+                   required => 1};
+
+	$fh->parse_validator($item);
+	is_deeply($item, $item_ok, "Nonce"); # Test 38
+
+    $item->{value} = '707';
+	my $b = $fh->validate($item);
+	is($b, undef, "Validate valid nonce"); # Test 39
+
+    $item->{value} = '808';
+	$b = $fh->validate($item);
+	is($b, 1, "Validate invalid nonce"); # Test 40
+};
+
+do {
     my $item = {valid => 'string[5,]', name => 'foo', value => 'bar'};
 
     $fh->parse_validator($item);
     my $field = $fh->build_field($item);
     is($field, '<input type="text" name="foo" value="bar" />',
-       "Form text field"); # Test 38
+       "Form text field"); # Test 41
 
     $item->{type} = 'textarea';
     $field = $fh->build_field($item);
     is($field, '<textarea name="foo" >bar</textarea>',
-       "Form textarea"); # Test 39
+       "Form textarea"); # Test 42
 
     $item->{style} = 'rows=20;cols=64';
     $field = $fh->build_field($item);
     is($field,
        '<textarea name="foo" rows="20" cols="64">bar</textarea>',
-       "Form textarea with style"); # Test 40
+       "Form textarea with style"); # Test 43
 
     delete $item->{type};
     delete $item->{style};
@@ -271,7 +288,7 @@ do {
 </select>
 EOQ
     chomp $r;
-    is($field, $r, "Form selection"); # Test 41
+    is($field, $r, "Form selection"); # Test 44
 
     delete $item->{type};
     delete $item->{style};
@@ -288,7 +305,7 @@ EOQ
 EOQ
     chomp $r;
     $r =~ s/\n/ /g;
-    is($field, $r, "Form radio buttons"); # Test 42
+    is($field, $r, "Form radio buttons"); # Test 45
 
     delete $item->{type};
     delete $item->{style};
@@ -305,7 +322,7 @@ EOQ
 EOQ
     chomp $r;
     $r =~ s/\n/ /g;
-    is($field, $r, "Form checkboxes"); # Test 43
+    is($field, $r, "Form checkboxes"); # Test 46
 };
 
 do {
@@ -317,21 +334,21 @@ do {
     $request->{value} = 7;
     my $response = $fh->run($request);
     like($response->content, qr/Value in bounds/,
-         "Run valid request"); # test 44
+         "Run valid request"); # test 47
 
     $request->{value} = 25;
     $response = $fh->run($request);
     like($response->content, qr/Value out of bounds/,
-         "Run invalid request"); # test 45
+         "Run invalid request"); # test 48
 
     delete $request->{value};
     $response = $fh->run($request);
     like($response->content, qr/Required field value is missing/,
-         "Run empty request"); # test 46
+         "Run empty request"); # test 49
 
     delete $request->{cmd};
     $response = $fh->run($request);
     like($response->content, qr/Please enter a value/,
-         "Run request with no commands"); # test 47
+         "Run request with no commands"); # test 50
 
 };

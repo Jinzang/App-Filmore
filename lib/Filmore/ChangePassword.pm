@@ -49,62 +49,6 @@ sub find_email {
 }
 
 #----------------------------------------------------------------------
-# Get the information about data fields
-
-sub info_object {
-    my ($self, $results) = @_;
-
-    return [{name => 'id',
-             type => 'hidden',
-             valid=>"&string"},
-            {name => 'password1',
-             title => 'Password',
-             type => 'password',
-             valid => '&string[8,]'},
-            {name => 'password2',
-             title => 'Repeat Password',
-             type => 'password',
-             valid => '&string[8,]'},
-           ];
-}
-
-#----------------------------------------------------------------------
-# Get the subtemplate used to render the file
-
-sub template_object {
-    my ($self, $results) = @_;
-
-     return <<'EOQ';
-<html>
-<head>
-<!-- section meta -->
-<title>Application Users</title>
-<!-- endsection meta -->
-</head>
-<body>
-<!-- section content -->
-<h1 id="banner">Change Password</h1>
-<p>$error</p>
-
-<p>Set the password for $email</p>
-
-<form method="post" action="$script_url">
-<!-- for @items -->
-<!-- if $type ne 'hidden' -->
-<b>$title</b><br />
-<!-- endif -->
-$field<br />
-<!-- endfor -->
-<input type="submit" name="cmd" value="cancel">
-<input type="submit" name="cmd" value="$cmd">
-</form>
-<!--endsection content -->
-</body>
-</html>
-EOQ
-}
-
-#----------------------------------------------------------------------
 # Call method to use data gathered from form
 
 sub use_object {

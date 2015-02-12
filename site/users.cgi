@@ -9,8 +9,7 @@ use lib "$Bin/../lib";
 use Filmore::CgiHandler;
 use File::Spec::Functions qw(catfile rel2abs splitdir);
 
-my $config_file = '';
-my $base_dir = get_base_dir($0);
+my $config_file = get_config_file($0);
 my %args = command_line(@ARGV);
 
 my $code = Filmore::CgiHandler->new(config_file => $config_file,
@@ -31,14 +30,6 @@ sub command_line {
         my ($name, $value);
         if ($arg =~ /=/) {
             ($name, $value) = split(/=/, $arg, 2);
-
-        } elsif ($arg =~ /\@/) {
-            $name = 'email';
-            $value = $arg;
-
-        } else {
-            $name = 'url';
-            $value = $arg;
         }
 
         $args{$name} = $value;
@@ -50,12 +41,16 @@ sub command_line {
 #----------------------------------------------------------------------
 # Get the base directory of the script
 
-sub get_base_dir {
+sub get_config_file {
     my ($script) = @_;
 
     my @dirs = splitdir($script);
-    pop(@dirs);
+    my $config_file = pop(@dirs);
+    $config_file = s/\.[^\.]*$//;
+    $config_file .= '.cfg';
 
     my $base_dir = catfile(@dirs) || '';
-    return rel2abs($base_dir);
+    $base_dir = rel2abs($base_dir);
+
+    return catfile($base_dir, $config_file);
 }

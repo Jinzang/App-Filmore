@@ -25,9 +25,11 @@ require Filmore::BrowseUser;
 require Filmore::WebFile;
 
 my $base_dir = catdir(@path, 'test');
+my $config_dir = catdir(@path, 'test', 'config');
 
 rmtree($base_dir);
 mkdir $base_dir;
+mkdir $config_dir;
 chdir $base_dir;
 $base_dir = getcwd();
 
@@ -51,6 +53,17 @@ EOQ
 
     my $file = catfile($base_dir, '.htpasswd');
     $wf->write_wo_validation($file, $text);
+
+    my $info = <<'EOQ';
+name = email
+title = Email Address
+type = radio
+style = linebreak=1
+valid = &string
+EOQ
+
+    my $info_file = catfile($config_dir, 'browse_user.info');
+    $wf->write_wo_validation($info_file, $info);
 };
 
 #----------------------------------------------------------------------

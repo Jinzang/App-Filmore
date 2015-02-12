@@ -62,53 +62,6 @@ EOQ
 }
 
 #----------------------------------------------------------------------
-# Get the information about data fields
-
-sub info_object {
-    my ($self, $results) = @_;
-
-    return [{name => 'email',
-             title => 'Email Address',
-             type => 'text',
-             valid=>"&email"},
-            ];
-}
-
-#----------------------------------------------------------------------
-# Get the subtemplate used to render the file
-
-sub template_object {
-    my ($self, $results) = @_;
-
-    return <<'EOQ';
-<html>
-<head>
-<!-- section meta -->
-<title>Application Users</title>
-<!-- endsection meta -->
-</head>
-<body>
-<!-- section content -->
-<h1 id="banner">Request Password</h1>
-<p>$error</p>
-
-<p>Send a request to change the password for:</p>
-
-<form method="post" action="$script_url">
-<!-- for @items -->
-<b>$title</b><br />
-$field<br />
-<!-- endfor -->
-<input type="submit" name="cmd" value="cancel">
-<input type="submit" name="cmd" value="$cmd">
-</form>
-<!--endsection content -->
-</body>
-</html>
-EOQ
-}
-
-#----------------------------------------------------------------------
 # Call method to use data gathered from form
 
 sub use_object {

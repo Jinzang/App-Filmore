@@ -263,6 +263,8 @@ sub valid_datatype {
         $flag = $self->valid_email($value);
     } elsif ($datatype eq 'int') {
         $flag = $self->valid_int($value);
+    } elsif ($datatype eq 'nonce') {
+        $flag = $self->valid_nonce($value);
     } elsif ($datatype eq 'number') {
         $flag = $self->valid_number($value);
     } elsif ($datatype eq 'string') {
@@ -318,6 +320,15 @@ sub valid_limits {
 
     die "Couldn't parse $limits" unless defined $min || defined $max;
     return 1;
+}
+
+#----------------------------------------------------------------------
+# Check the value of nonce
+
+sub valid_nonce {
+    my ($self, $item) = @_;
+
+    return $item eq $self->{webfile_ptr}->get_nonce();
 }
 
 #----------------------------------------------------------------------

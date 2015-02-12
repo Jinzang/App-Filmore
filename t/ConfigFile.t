@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 use strict;
 
-use Test::More tests => 10;
+use Test::More tests => 6;
 
 use Cwd;
 use IO::File;
@@ -78,38 +78,22 @@ do {
 };
 
 #----------------------------------------------------------------------
-# Set field with interpolation
-
-do {
-    my $hash = {
-                one => 1,
-                two => 2,
-               };
-
-    $cf->set_field($hash, 'three', '$two + $one');
-    is($hash->{three}, '2 + 1', "Variable interpolation"); # test 4
-
-    $cf->set_field($hash, 'eleven', '${one}1');
-    is($hash->{eleven}, 11, "Variable interpolation with braces");  # test 5
-};
-
-#----------------------------------------------------------------------
 # Test io
 
 do {
-    my $configuration = $cf->read_file($config_file);
+    my @configuration = $cf->read_file($config_file);
 
-    my $configuration_result = {
-                                one => 1,
-                                two => 2,
-                                };
+    my $configuration_result = [{
+                                 one => 1,
+                                 two => 2,
+                                }];
 
-    is_deeply($configuration, $configuration_result, "Read file"); #test 6
+    is_deeply(\@configuration, $configuration_result, "Read file"); #test 4
 
     $cf->write_file($config_file, $configuration_result);
-    $configuration = $cf->read_file($config_file);
+    @configuration = $cf->read_file($config_file);
 
-    is_deeply($configuration, $configuration_result, "Write file"); # test 7
+    is_deeply(\@configuration, $configuration_result, "Write file"); # test 5
 
     $config .= "include config\n";
 
@@ -117,25 +101,14 @@ do {
     print $io $config;
     close($io);
 
-    $configuration = $cf->read_file($config_file);
+    @configuration = $cf->read_file($config_file);
 
-    my $configuration_result = {
-                                one => 1,
-                                two => 2,
-                                three => 3,
-                                four => 4,
-                                };
+    $configuration_result = [
+                             {one => 1,
+                              two => 2,},
+                             {three => 3,
+                              four => 4},
+                            ];
 
-    is_deeply($configuration, $configuration_result, "Include file"); # test 8
-
-    $configuration_result = {
-                             array => [1, 2, 3, 4],
-                             hash => {first => 1, second => 2},
-                             };
-
-    $cf->write_file($config_file, $configuration_result);
-    $configuration = $cf->read_file($config_file);
-
-    is_deeply($configuration, $configuration_result,
-              "Read and write structures"); # test 9
+    is_deeply(\@configuration, $configuration_result, "Include file"); # test 6
 };

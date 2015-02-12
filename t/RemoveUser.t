@@ -75,15 +75,16 @@ do  {
     my $msg = $ru->validate_object($results);
     is($msg, undef, "Validate request"); # test 1
 
-    my $bad_mail = 'blue@test.com';
+    my $bad_mail = $params{web_master};
     $results = {email => $bad_mail, nonce => $nonce};
     $msg = $ru->validate_object($results);
-    is($msg, "User not found: $bad_mail", "Validate bad user"); # test 2
+    is($msg, "Cannot remove web master", "Validate web master"); # test 2
 
-    $bad_mail = $params{web_master};
+    $bad_mail = 'blue@test.com';
     $results = {email => $bad_mail, nonce => $nonce};
-    $msg = $ru->validate_object($results);
-    is($msg, "Cannot remove web master", "Validate web master"); # test 3
+    my $flag  = $ru->check_id_object($results);
+    is($flag, '', "Check id of bad user"); # test 3
+
 };
 
 #----------------------------------------------------------------------
