@@ -3,67 +3,38 @@
 use strict;
 use warnings;
 
-use CGI;
-use Cwd;
 use IO::Dir;
 use IO::File;
 use Data::Dumper;
-use MIME::Base64 qw(decode_base64);
-use File::Spec::Functions qw(catfile splitdir file_name_is_absolute);
+use File::Spec::Functions qw(catfile rel2abs splitdir);
 
-use constant DEFAULT_GROUP => '';
-use constant DEFAULT_PERMISSIONS => 0666;
+use constant INTERACTIVE_MODE => 1;
+use constant CGI_MODE => 2;
 
-our $modeline;
-my $interactive = is_interactive();
+#---------------------------------- ------------------------------------
+# Main procedure
+
+my $mode = get_mode();
 
 my $request;
-if ($interactive) {
-    $request = get_arguments(@ARGV);
-} else {
+if ($mode == INTERACTIVE_MODE) {
+    $request = get_arguments();
+} elsif ($mode == CGI_MODE) {
     $request = get_request();
 }
 
 eval {
     if ($request->{error} = check_request($request)) {
-        show_form($interactive, $request);
+        show_form($mode, $request);
     } else {
-        run($interactive, $request);
+        handle_request($mode, $request);
     }
 };
 
 if ($@) {
     $request->{error} = $@;
     $request->{dump} = dump_state();
-    show_form($interactive, $request);
-}
-
-#----------------------------------------------------------------------
-# Main routine
-
-sub run {
-    my ($interactive, $request) = @_;
-
-    my $include = get_include();
-    my %parameters = set_parameters($include, $request);
-
-    my $scripts = copy_site($include, %parameters);
-    protect_files($include, $request, $scripts, \%parameters);
-
-    if ($interactive) {
-        print "Scripts initialized\n";
-        unlink($0);
-
-    } elsif (-e 'index.html') {
-        redirect($parameters{base_url});
-        unlink($0);
-
-    } else {
-        $request->{error} = "Scripts initialized";
-        show_form($interactive, $request);
-    }
-
-    return;
+    show_form($mode, $request);
 }
 
 #----------------------------------------------------------------------
@@ -75,139 +46,20 @@ sub check_request {
     my %missing = (
                     url => "Please paste url of this page",
                     user => "Please enter user email and password",
-                    password => "Please enter password",
+                    pass1 => "Please enter password",
                    );
-    
+
+    my $empty = "Please enter the info to configure this site";
     my $nomatch = "Passwords don't match";
-    
+
+    return $empty unless %$request;
+
     foreach my $field (keys %missing) {
-        return $missing{$field} unless exists $request->{$field}
+        return $missing{$field} unless defined $request->{$field}
                          && $request->{$field} =~ /\S/;
     }
-    
+
     return $nomatch unless $request->{pass1} eq $request->{pass2};
-    
-    return;
-}
-
-#----------------------------------------------------------------------
-# Build an argument list from the command line, for testing
-
-sub command_line {
-    my @args = @_;
-    
-    my %request;
-    foreach my $arg (@args) {
-        my ($name, $value);
-        if ($arg =~ /=/) {
-            ($name, $value) = split(/=/, $arg, 2);
-            $request{$name} = $value;
-        }
-    }
-
-    $request{pass2} ||= $request{pass1};
-    return \%request;
-}
-
-#----------------------------------------------------------------------
-# Read the script configuration information
-
-sub configuration_info {
-    my ($file, $text) = @_;
-
-    my $info = {};
-    my %vars = map {$_ => 1} qw(public);
-    my @lines = split(/\n/, $text);
-    my ($basename) = get_basename($file);
-
-    foreach my $line (@lines) {
-        next if $line =~ /^\s*\#/;
-
-        my ($name, $value) = split(/\s*=\s*/, $line);
-        next unless defined $value;
-
-        $value =~ s/\s+$//;
-        $info->{$name} = $value if $vars{$name};
-    }
-
-    return ($basename, $info);    
-}
-
-#----------------------------------------------------------------------
-# Create a copy of the input file
-
-sub copy_file {
-    my ($mode, $file, $text) = @_;
-
-    my $out = IO::File->new($file, 'w') or die "Can't write $file";
-
-    if ($mode eq 'b') {
-        binmode($out);
-        my @lines = split(/\n/, $text);
-        foreach my $line (@lines) {
-            print $out decode_base64($line);
-        }
-
-    } else {
-        chomp $text;
-        print $out $text;        
-    }
-    
-    close($out);
-    return;
-}
-
-#----------------------------------------------------------------------
-# Copy initial version of website to target
-
-sub copy_site {
-    my ($include, %parameters) = @_;   
-
-    my $scripts = {};
-    while (my ($mode, $file, $text) = next_file()) {
-        $file = map_filename($include, $file);
-        create_dirs($file, \%parameters);        
-        my $modifiers;
-
-        if ($file =~ /\.cgi$/) {
-            $modifiers = 'x';
-            my $parameters = update_parameters($file, %parameters);
-            $text = edit_script($file, $text, $include, $parameters);
-
-        } elsif ($file =~ /\.cfg$/) {
-            my $parameters = update_parameters($file, %parameters);
-            $text = update_configuration($text, $parameters);
-
-            my ($basename, $info) = configuration_info($file, $text);
-            $scripts->{$basename} = $info;
-        }
-    
-        copy_file($mode, $file, $text);    
-        set_permissions($file, \%parameters, $modifiers);
-    }
-
-    return $scripts;
-}
-
-#----------------------------------------------------------------------
-# Check path and create directories as necessary
-
-sub create_dirs {
-    my ($file, $parameters) = @_;
-
-    my @dirs = split(/\//, $file);
-    pop @dirs;
-    
-    my @path = ('/');
-    while (@dirs) {
-        push(@path, shift(@dirs));
-        my $path = catfile(@path);
-
-        if (! -d $path) {
-            mkdir ($path) or die "Couldn't create $path: $!\n";
-            set_permissions($path, $parameters, 'x')
-        }
-    }
 
     return;
 }
@@ -216,7 +68,7 @@ sub create_dirs {
 # Dump the state of this script
 
 sub dump_state {
-    my ($msg) = @_; 
+    my ($msg) = @_;
 
     my $dumper = Data::Dumper->new([\%ENV], ['ENV']);
     my $env = $dumper->Dump();
@@ -225,101 +77,31 @@ sub dump_state {
 }
 
 #----------------------------------------------------------------------
-# Edit script to work on website
-
-sub edit_script {
-    my ($file, $text, $include, $parameters) = @_;
-        
-    # Change shebang line
-    my $perl = `/usr/bin/which perl`;
-    chomp $perl;
-    $text =~ s/\#\!(\S+)/\#\!$perl/;
-
-    # Change use lib line
-    if ($text =~ /use lib/) {
-        $text  =~ s/use lib \'(\S+)\'/use lib \'$include->{lib}\'/;
-    }
-    
-    # Set configuration file
-
-    if ($text =~ /my \$config_file/) {
-        $text  =~ s/my \$config_file = \'(\S*)\'/my \$config_file = \'$parameters->{config_file}\'/;
-    }
-    
-    return $text;
-}
-
-#----------------------------------------------------------------------
-# Encrypt password
-
-sub encrypt {
-	my ($plain) = @_;;
-
-	my $salt = join '', ('.', '/', 0..9, 'A'..'Z', 'a'..'z')[rand 64, rand 64];
-    return crypt($plain, $salt);
-}
-
-#----------------------------------------------------------------------
-# Find the path to the sendmail command
-
-sub find_sendmail {
-    my $path;
-    
-    foreach $path (qw(/usr/lib/sendmail /usr/sbin/sendmail)) {
-        return $path if -e $path;       
-    }
-    
-    $path = `which sendmail`;
-    chomp $path;
-    
-    return $path || '';
-}
-
-#----------------------------------------------------------------------
 # Get the arguments from the command line or interactively
 
 sub get_arguments {
-    my @args = @_;
-    
-    my $request = command_line(@args);
+
+    my $request = {};
     while ($request->{error} = check_request($request)) {
         query_args($request);
     }
-    
+
     return $request;
 }
 
 #----------------------------------------------------------------------
-# Extract basename from filename
+# Determine the mode from the statusof stdin and stdout
 
-sub get_basename {
-    my ($file) = @_;
-    
-    my @path = splitdir($file);
-    my $root = pop(@path);
-    my ($basename, $ext) = split(/\./, $root);
-    
-    return $basename;
-}
+sub get_mode {
 
-#----------------------------------------------------------------------
-# Get the locations of the directories we need
-
-sub get_include {
-    # Set directory to one containing this script
-    
-    my $dir = $0;
-    $dir =~ s{/?[^/]*$}{};
-    $dir ||= '.';
-    
-    chdir $dir or die "Cannot cd to $dir";
-    
-    my $include = {};
-    while (my ($source, $target) = next_dir()) {
-        $include->{$source} = rel2abs($target);
+    my $mode;
+    if (-t STDIN && -t STDOUT) {
+        $mode = INTERACTIVE_MODE;
+    } else {
+        $mode = CGI_MODE;
     }
-    
-    return $include;    
+
+    return $mode;
 }
 
 #----------------------------------------------------------------------
@@ -336,126 +118,33 @@ sub get_request {
         my @array = split(/\000/, $request{$field});
         $request{$field} = \@array;
     }
-    
+
     return \%request;
 }
 
 #----------------------------------------------------------------------
-# Check if script is being run interactively
+# Handle a validated request
 
-sub is_interactive {
-    return -t STDIN && -t STDOUT
-}
+sub handle_request {
+    my ($mode, $request) = @_;
 
-#----------------------------------------------------------------------
-# Map filename to name on uploaded system
+    set_directory();
+    my $context = Snarf->new($request);
+    $context->run();
 
-sub map_filename {
-    my ($include, $file) = @_;
-    
-    my @path = splitdir($file);
-    my $dir = shift(@path);
-    
-    if (exists $include->{$dir}) {
-        unshift(@path, $include->{$dir}) if $include->{$dir};
-        $file = catfile(@path);
-    }
-        
-    return $file;
-}
+    if ($mode == INTERACTIVE_MODE) {
+        print "Scripts initialized\n";
+        unlink($0);
 
-#----------------------------------------------------------------------
-# Get the name of the next directory
+    } elsif (-e 'index.html') {
+        redirect($context->get('base_url'));
+        unlink($0);
 
-sub next_dir {
-    $modeline = <DATA>;
-    return unless $modeline =~ /^\#\+\+\%X\+\+\%X/;
-    
-    my ($comment, $source, $target) = split(' ', $modeline);
-    die "Bad modeline: $modeline\n" unless defined $source;
-    $target = '' unless defined $target;
-    
-    return ($source, $target)
-}
-
-#----------------------------------------------------------------------
-# Get the name and contents of the next file
-
-sub next_file {
-    
-    return unless $modeline;
-    my ($comment, $mode, $file) = split(' ', $modeline);
-    die "Bad modeline: $modeline\n" unless defined $file;
-    
-    my $text = '';
-    $modeline = '';
-    
-    while (<DATA>) {
-        if (/^\#--\%X--\%X/) {
-            $modeline = $_;
-            last;
-
-        } else {
-            $text .= $_;
-        }
-    }
-    
-    return ($mode, $file, $text);
-}
-
-#----------------------------------------------------------------------
-# Parse a url into its components
-
-sub parse_url {
-    my ($url) = @_;
-
-    my %parsed_url = (method => 'http:', domain => '', path => '',
-                      file => '', params => '');
-
-    my ($method, $rest) = split(m!//!, $url, 2);
-
-    unless (defined $rest) {
-        $rest = $method;
     } else {
-        $parsed_url{method} = $method;
+        $request->{error} = "Scripts initialized";
+        show_form($mode, $request);
     }
-    
 
-    if ($rest) {
-        my ($rest, $params) = split(/\?/, $rest);
-        $parsed_url{params} = $params || '';
-        my @path = split(m!/!, $rest);
-
-        if (@path) { 
-            if ($path[0] =~ /\.(com|org|edu|us)$/) {
-                $parsed_url{domain} = $path[0];
-                $path[0] = '';
-            }
-            
-            $parsed_url{file} = pop(@path) if $path[-1] =~ /\./;
-            $parsed_url{path} = join('/', @path);
-        }
-    }
-    
-    return \%parsed_url;
-}
-#----------------------------------------------------------------------
-# Protect the files with access and password files
-
-sub protect_files {
-    my ($include, $request, $scripts, $parameters) = @_;
-
-    while (my($source, $target) = each %$include) {
-        if ($source eq 'site') {
-            write_access_file($target, $scripts, $parameters);
-            write_group_file($target, $request, $scripts, $parameters);
-            write_password_file($target, $request, $parameters);
-
-        } else {
-            write_no_access_file($target, $parameters);
-        }
-    }
-    
     return;
 }
 
@@ -466,7 +155,7 @@ sub query_args {
     my ($request) = @_;
 
     print $request->{error}, "\n\n" if $request->{error};
-    
+
     my @fields = request_fields();
     for my $field (@fields) {
         my $name = $field->{name};
@@ -480,117 +169,18 @@ sub query_args {
 
         $request->{$name} = $value || $request->{$name};
     }
-   
+
     return;
 }
-
-#----------------------------------------------------------------------
-# Read the access control file up until a files command is seen
-
-sub read_access_file {
-    my ($file) = @_;
-    
-    my $fd;
-    $fd = IO::File->($file, 'r') if -e $file;
-    my @lines = ('');
-
-    if ($fd) {
-        while (<$fd>) {
-            last if /^<Files/;
-            push(@lines, $_);
-        }
-
-        close $fd;
-    }
-
-    return join('', @lines);
-}
-
-#----------------------------------------------------------------------
-# Read the groups files
-
-sub read_groups_file {
-    my ($file, $scripts) = @_;    
-
-    my $fd;
-    $fd = IO::File->($file, 'r') if -e $file;
- 
-    if ($fd) {
-        while (<$fd>) {
-            chomp;
-            my ($group, $user_list) = split(/\s*:\s*/, $_, 2);
-            next unless $group && exists $scripts->{$group};
-            
-            my %users = map {$_ => 1} split(' ', $user_list);
-            $scripts->{$group}{users} = \%users;
-        }
-
-        close $fd;
-    }
-    
-    return $scripts;
- }
-
-#----------------------------------------------------------------------
-# Read the current password file into a hash
-
-sub read_password_file {
-    my ($file) = @_;    
-
-    my $fd;
-    my %passwords;
-    $fd = IO::File->($file, 'r') if -e $file;
- 
-    if ($fd) {
-        while (<$fd>) {
-            chomp;
-            my ($user, $password) = split(/\s*:\s*/, $_, 2);
-            next unless $password;
-            
-            $passwords{$user} = $password;
-        }
-
-        close $fd;
-    }
-    
-    return \%passwords;
- }
 
 #----------------------------------------------------------------------
 # Redirect browser to url
 
 sub redirect {
     my ($url) = @_;
-    
+
     print "Location: $url\n\n";
     return;
-}
-
-#----------------------------------------------------------------------
-# Convert relative filename to absolute
-
-sub rel2abs {
-    my ($filename) = @_;
-
-    my @path;
-    my $base_dir = getcwd();
-    @path = splitdir($base_dir) unless file_name_is_absolute($filename);
-    push(@path, splitdir($filename));
-
-    my @newpath = ('');
-    while (@path) {
-        my $dir = shift @path;
-        if ($dir eq '' or $dir eq '.') {
-            ;
-        } elsif ($dir eq '..') {
-            pop(@newpath) if @newpath > 1;
-        } else {
-            push(@newpath, $dir);
-        }
-    }
-
-    $filename = catfile(@newpath);
-    return $filename;
 }
 
 #----------------------------------------------------------------------
@@ -602,80 +192,18 @@ sub request_fields {
             {name => 'pass1', title => 'Password'},
             {name => 'pass2', title => 'Repeat Password'},
             {name => 'url', title => 'Site url', show => 1},
-            );    
+            );
 }
 
 #----------------------------------------------------------------------
-# Set the base url from the script url
+# Set the directory to the one containing the executable
 
-sub set_base_url {
-    my ($request) = @_;
-    
-    my $parsed_url = parse_url($request->{url});
-    my @script_path = split('/', $parsed_url->{path});
-    pop(@script_path);
-        
-    my $base_url = join('/', @script_path);
-    return $base_url;
-}
+sub set_directory {
+    my @path = splitdir(rel2abs($0));
+    pop(@path);
 
-#----------------------------------------------------------------------
-# Set the group of a file
-
-sub set_group  {
-    my ($filename, $group) = @_;
-
-    return unless -e $filename;
-    return unless $group;
-
-    my $gid = getgrnam($group);
-    return unless $gid;
-
-    my $status = chown(-1, $gid, $filename);
-    return;
-}
-
-#----------------------------------------------------------------------
-# Set parameters for script
-
-sub set_parameters {
-    my ($include, $request) = @_;
-
-    my $base_directory = getcwd();
-    my $base_url = set_base_url($request);
-    my $sendmail = find_sendmail();
-    
-    # Set reasonable defaults for parameters
-    
-    my %parameters = (
-                    group => DEFAULT_GROUP,
-                    permissions => DEFAULT_PERMISSIONS,
-                    base_directory => $base_directory,
-                    base_url => $base_url,
-                    config_file => "*.cfg",
-                    sendmail_command => $sendmail,
-                    site_template => "$include->{templates}/*.htm",
-                    valid_read => [$base_directory],
-                    web_master => $request->{user},
-                   );
-
-    return %parameters;
-}
-
-#----------------------------------------------------------------------
-# Set permissions on a file
-
-sub set_permissions {
-    my ($file, $parameters, $modifiers) = @_;
-    $modifiers = '' unless defined $modifiers;
-
-    my $permissions = $parameters->{permissions} & 0775;
-    $permissions |= 0111 if $modifiers =~ /x/;
-    $permissions |= 0222 if $modifiers =~ /w/;
-    $permissions |= 0444 if $modifiers =~ /r/;    
-    
-    set_group($file, $parameters->{group});
-    chmod($permissions, $file);
+    my $dir = catfile(@path);
+    chdir($dir);
 
     return;
 }
@@ -684,8 +212,8 @@ sub set_permissions {
 # Show form to get user name and password
 
 sub show_form {
-    my ($interactive, $request) =  @_;    
-    
+    my ($mode, $request) =  @_;
+
     my $template = <<'EOS';
 <head>
 <title>Filmore</title>
@@ -717,146 +245,53 @@ div#footer p{padding: 10px;}
 </form>
 <div id="footer"><p>This is free software,
 licensed on the same terms as Perl.</p></div>
-</div>    
+</div>
 </body></html>
 EOS
 
-    if ($interactive) {
+    if ($mode == INTERACTIVE_MODE) {
         print $request->{error}, "\n";
-    } else {
+
+    } elsif ($mode == CGI_MODE) {
         $template =~ s/{{([^}]*)}}/$request->{$1} || ''/ge;
         print("Content-type: text/html\n\n$template");
     }
-    
+
     return;
 }
 
 #----------------------------------------------------------------------
-# Update configuration file
+# Commands that the snarf command processor will respond to
 
-sub update_configuration {
-    my ($text, $parameters) = @_;
+package SnarfCommand;
 
-    my %done;
-    my @new_lines;
-    my @lines = split(/\n/, $text);
-    
-    foreach my $line (@lines) {
-        if ($line =~ /^\s*#/) {
-            push(@new_lines, $line);
+use Cwd;
+use IO::File;
+use File::Spec::Functions qw(catfile splitdir file_name_is_absolute);
 
-        } else {
-            my ($name, $value) = split(/\s*=\s*/, $line);
- 
-            if (! defined $value) {
-                push(@new_lines, $line);
+use constant DEFAULT_GROUP => '';
+use constant DEFAULT_PERMISSIONS => 0644;
+use constant DIVIDER => "/* Do not change code below this line */\n";
 
-            } elsif (! $done{$name}) {
-                if ($parameters->{$name}) {
-                    if (ref $parameters->{$name} eq 'ARRAY') {
-                        foreach my $val (@{$parameters->{$name}}) {
-                            push(@new_lines, "$name = $val");
-                        }
+#----------------------------------------------------------------------
 
-                    } else {
-                        push(@new_lines, "$name = $parameters->{$name}")
-                    }
-                    $done{$name} = 1;
+sub new {
+    my ($pkg, %args) = @_;
 
-                } else {
-                    push(@new_lines, $line);
-                }
-            }
-        }
-    }
-    
-    return join("\n", @new_lines) . "\n";
+    my $self = {};
+    return bless($self, $pkg);
 }
 
 #----------------------------------------------------------------------
-# Update parameters by substituting for wild card
+# Write file that blocks access to directory
 
-sub update_parameters {
-    my ($file, %parameters) = @_;
+sub call_hide {
+    my ($self, $context, $directory) = @_;
 
-    my ($basename) = get_basename($file);
-    
-    while (my ($name, $value) = each %parameters) {
-        $value =~ s/\*/$basename/;
-        $parameters{$name} = $value;        
-    }
+    my $file = catfile($directory, '.htaccess');
+    $self->create_dirs($context, $file);
 
-    return \%parameters;
-}
-
-#----------------------------------------------------------------------
-# Write access file for password protected site
-
-sub write_access_file {
-    my ($directory, $scripts, $parameters) = @_;
-
-    my $file = "$directory/.htaccess";
-
-    my $text = read_access_file($file);
-    
-    my $fd = IO::File->new($file, 'w')
-        or die "Can't open $file: $!\n";
-
-    print $text;
-    foreach my $basename (keys %$scripts) {
-        next if $scripts->{$basename}{public};
-        
-        print $fd <<"EOS";
-<Files "$basename.cgi">
-  AuthName "Password Required"
-  AuthType Basic
-  AuthUserFile $directory/.htpasswd
-  AuthGroupFile $directory/.htgroups
-  Require group $basename
-</Files>
-EOS
-    }
-
-    close($fd);
-    set_permissions($file, $parameters);  
-    return;
-}
-
-#----------------------------------------------------------------------
-# Write group file for password protected site
-
-sub write_group_file {
-    my ($directory, $request, $scripts, $parameters) = @_;
-
-    my $file = "$directory/.htgroups";
-    $scripts = read_groups_file($file, $scripts);
- 
-    my $fd = IO::File->new($file, 'w')
-        or die "Can't open $file: $!\n";
-
-    my $user = $request->{user};
-    foreach my $basename (keys %$scripts) {
-        next if $scripts->{$basename}{public};
-        $scripts->{$basename}{users}{$user} = 1;
- 
-        my $user_list = join(' ', sort keys %{$scripts->{$basename}{users}});
-        print $fd "$basename: $user_list\n";
-    }
-
-    close($fd);
-    set_permissions($file, $parameters);  
-    return;
-}
-
-#----------------------------------------------------------------------
-# Write file that blocks access to site
-
-sub write_no_access_file {
-    my ($directory, $parameters) = @_;
-
-    my $file = "$directory/.htaccess";
-    my $fd = IO::File->new($file, 'w')
-        or die "Can't open $file: $!\n";
+    my $fd = IO::File->new($file, 'w') or die "Couldn't write $file; $!\n";
 
     print $fd <<'EOS';
 AuthUserFile /dev/null
@@ -869,31 +304,731 @@ order deny,allow
 EOS
 
     close($fd);
-    set_permissions($file, $parameters);  
+    $self->change_permissions($context, $file);
 
-    return;    
+    return;
+}
+
+#----------------------------------------------------------------------
+# Dump the context to a file, for debugging
+
+sub call_log {
+    my ($self, $context, $file) = @_;
+
+    my $dumper = Data::Dumper->new([$context], ['context']);
+    my $log = IO::File->new($file, 'w') or die "Couldn't open $file: $!\n";
+
+    print $log $dumper->Dump();
+    close($log);
+
+    return;
+}
+
+#----------------------------------------------------------------------
+# Protect the top directory by writing access, group and password files
+
+sub call_protect {
+    my ($self, $context) = @_;
+
+    my $directory = getcwd();
+    $self->write_access_file($context, $directory);
+    $self->write_group_file($context, $directory);
+    $self->write_password_file($context, $directory);
+
+    return;
+}
+
+#----------------------------------------------------------------------
+# Change the group ownership of a file
+
+sub change_group  {
+    my ($self, $file, $group) = @_;
+
+    return unless -e $file;
+    return unless $group;
+
+    my $gid = getgrnam($group);
+    return unless $gid;
+
+    my $status = chown(-1, $gid, $file);
+    return;
+}
+
+#----------------------------------------------------------------------
+# Change permissions on a file
+
+sub change_permissions {
+    my ($self, $context, $file, $modifiers) = @_;
+    $modifiers = '' unless defined $modifiers;
+
+    my $permissions = $context->get('permissions') & 0775;
+    $permissions |= 0111 if $modifiers =~ /x/;
+    $permissions |= 0222 if $modifiers =~ /w/;
+    $permissions |= 0444 if $modifiers =~ /r/;
+
+    $self->change_group($file, $context->get('group'));
+    chmod($permissions, $file);
+
+    return;
+}
+
+#----------------------------------------------------------------------
+# Copy the configuration file, noting if the command is protected
+
+sub copy_configuration {
+    my ($self, $context, $lines, $file) = @_;
+
+    foreach (@$lines) {
+        next if /^#/ || /^\s+/;
+
+        my ($name, $value) = split(/\s*=\s*/, $_);
+        next unless $name eq 'protect';
+
+        if ($value) {
+            my $basename = $self->get_basename($file);
+            $context->{command}->set_note($context, $basename);
+        }
+    }
+
+    return $self->copy_file($context, $lines, $file);
+}
+
+#----------------------------------------------------------------------
+# Create a copy of the input file
+
+sub copy_file {
+    my ($self, $context, $lines, $file, $mode) = @_;
+    $mode = 't' unless defined $mode;
+
+    $file = $self->map_filename($context, $file);
+    $self->create_dirs($context, $file);
+
+    my $out = IO::File->new($file, 'w') or die "Couldn't write $file: $!\n";
+
+    if ($mode eq 'b') {
+        binmode($out);
+        foreach my $line (@$lines) {
+            print $out decode_base64($line);
+        }
+
+    } else {
+        foreach my $line (@$lines) {
+            print $out $line;
+        }
+    }
+
+    close($out);
+    return;
+}
+
+#----------------------------------------------------------------------
+# Update include file and then write it
+
+sub copy_include {
+    my ($self, $context, $lines, $file) = @_;
+
+    foreach (@$lines) {
+        next if /^#/ || /^\s+/ || ! /=/ ;
+
+        my ($name, $value) = split(/\s*=\s*/, $_);
+
+        my $new_value = $context->get($name);
+        $new_value= '' unless defined $new_value;
+        $_ = "$name = $new_value\n" if defined $new_value;
+    }
+
+    return $self->copy_file($context, $lines, $file);
+}
+
+#----------------------------------------------------------------------
+# Update cgi script and then write it
+
+sub copy_script {
+    my ($self, $context, $lines, $file) = @_;
+
+    my $perl = $context->get('perl');
+    my $map = $context->get('map');
+    my $library = $context->get('library');
+    $library = $self->map_filename($context, $library);
+
+    foreach (@$lines) {
+        # Change shebang line
+        s/^\#\!(\S+)/\#\!$perl/;
+        # Change use lib line
+        s/^use lib \'(\S+)\'/use lib \'$library\'/;
+    }
+
+    my $status = $self->copy_file($context, $lines, $file);
+    $self->change_permissions($context, $file, 'x') if $status;
+
+    return $status;
+}
+
+#----------------------------------------------------------------------
+# Check path and create directories as necessary
+
+sub create_dirs {
+    my ($self, $context, $file) = @_;
+
+    my @dirs = splitdir($file);
+    pop @dirs;
+
+    my @path;
+    while (@dirs) {
+        push(@path, shift(@dirs));
+        my $path = catfile(@path);
+
+        if (! -d $path) {
+            mkdir ($path) or die "Couldn't create $path: $!\n";
+            $self->change_permissions($context, $path, 'x')
+        }
+    }
+
+    return;
+}
+
+#----------------------------------------------------------------------
+# Encrypt password
+
+sub encrypt {
+	my ($self, $plain) = @_;;
+
+	my $salt = join '', ('.', '/', 0..9, 'A'..'Z', 'a'..'z')[rand 64, rand 64];
+    return crypt($plain, $salt);
+}
+
+#----------------------------------------------------------------------
+# Find the path to the sendmail command
+
+sub find_sendmail {
+    my ($self) = @_;
+    my $path;
+
+    foreach $path (qw(/usr/lib/sendmail /usr/sbin/sendmail)) {
+        return $path if -e $path;
+    }
+
+    $path = `which sendmail`;
+    chomp $path;
+
+    return $path || '';
+}
+
+#----------------------------------------------------------------------
+# Extract basename from filename
+
+sub get_basename {
+    my ($self, $file) = @_;
+
+    my @path = splitdir($file);
+    my $root = pop(@path);
+    my ($basename, $ext) = split(/\./, $root);
+
+    return $basename;
+}
+
+#----------------------------------------------------------------------
+# Get the base url from the script url
+
+sub get_base_url {
+    my ($self, $request) = @_;
+
+    my $parsed_url = $self->parse_url($request->{url});
+    my @script_path = split('/', $parsed_url->{path});
+    pop(@script_path);
+
+    my $base_url = @script_path ? join('/', @script_path) : '/';
+    return $base_url;
+}
+
+#----------------------------------------------------------------------
+# Initialize variables for script
+
+sub initialize {
+    my ($self, $request) = @_;
+
+    my $base_directory = getcwd();
+    my $base_url = $self->get_base_url($request);
+
+    my $sendmail = $self->find_sendmail();
+    my $password = $self->encrypt($request->{pass1});
+
+    my $perl = `/usr/bin/which perl`;
+    chomp $perl;
+
+    # Set reasonable defaults for parameters
+
+    my $variables = {
+                     group => DEFAULT_GROUP,
+                     permissions => DEFAULT_PERMISSIONS,
+                     perl => $perl,
+                     base_directory => $base_directory,
+                     base_url => $base_url,
+                     sendmail_command => $sendmail,
+                     password => $password,
+                     valid_read => [$base_directory],
+                     web_master => $request->{user},
+                    };
+
+    return $variables;
+}
+
+#----------------------------------------------------------------------
+# Map filename to name on uploaded system
+
+sub map_filename {
+    my ($self, $context, $file) = @_;
+
+    my $map = $context->get('map');
+    if ($map) {
+        my @path = splitdir($file);
+        my $dir = shift(@path);
+
+        if (exists $map->{$dir}) {
+            if ($map->{$dir}) {
+                unshift(@path, $map->{$dir});
+            }
+
+        } else {
+            unshift(@path, $dir);
+        }
+
+        $file = catfile(@path);
+    }
+
+    return $file;
+}
+
+#----------------------------------------------------------------------
+# Parse a url into its components
+
+sub parse_url {
+    my ($self, $url) = @_;
+    die "Url undefined" unless defined $url;
+
+    my %parsed_url = (method => 'http:', domain => '', path => '',
+                      file => '', params => '');
+
+    my ($method, $rest) = split(m!//!, $url, 2);
+
+    unless (defined $rest) {
+        $rest = $method;
+    } else {
+        $parsed_url{method} = $method;
+    }
+
+
+    if ($rest) {
+        my ($rest, $params) = split(/\?/, $rest);
+        $parsed_url{params} = $params || '';
+        my @path = split(m!/!, $rest);
+
+        if (@path) {
+            if ($path[0] =~ /\.(com|org|edu|us)$/) {
+                $parsed_url{domain} = $path[0];
+                $path[0] = '';
+            }
+
+            $parsed_url{file} = pop(@path) if $path[-1] =~ /\./;
+            $parsed_url{path} = join('/', @path);
+        }
+    }
+
+    return \%parsed_url;
+}
+
+#----------------------------------------------------------------------
+# Read the access control file up until a divider comment
+
+sub read_access_file {
+    my ($self, $file) = @_;
+
+    my $fd;
+    $fd = IO::File->new($file, 'r') if -e $file;
+    my @lines = ('');
+
+    if ($fd) {
+        while (<$fd>) {
+            last if $_ eq DIVIDER;
+            push(@lines, $_);
+        }
+
+        close $fd;
+    }
+
+    return join('', @lines);
+}
+
+#----------------------------------------------------------------------
+# Read the groups files
+
+sub read_groups_file {
+    my ($self, $file, $note, $web_master) = @_;
+    my $scripts = {};
+
+    my $fd;
+    $fd = IO::File->($file, 'r') if -e $file;
+
+    if ($fd) {
+        while (<$fd>) {
+            chomp;
+            my ($group, $user_list) = split(/\s*:\s*/, $_, 2);
+            next unless $group && exists $scripts->{$group};
+
+            my %users = map {$_ => 1} split(' ', $user_list);
+            $users{$web_master} = 1;
+
+            $scripts->{$group} = \%users;
+        }
+
+        close $fd;
+    }
+
+    foreach my $group (keys %$note) {
+        next if $scripts->{$group};
+        $scripts->{$group} = {$web_master => 1};
+    }
+
+    return $scripts;
+ }
+
+#----------------------------------------------------------------------
+# Read the current password file into a hash
+
+sub read_password_file {
+    my ($self, $file) = @_;
+
+    my $fd;
+    my %passwords;
+    $fd = IO::File->($file, 'r') if -e $file;
+
+    if ($fd) {
+        while (<$fd>) {
+            chomp;
+            my ($user, $password) = split(/\s*:\s*/, $_, 2);
+            next unless $password;
+
+            $passwords{$user} = $password;
+        }
+
+        close $fd;
+    }
+
+    return \%passwords;
+}
+
+#----------------------------------------------------------------------
+# Convert relative filename to absolute
+
+sub rel2abs {
+    my ($self, $filename) = @_;
+
+    my @path;
+    my $base_dir = getcwd();
+    @path = splitdir($base_dir) unless file_name_is_absolute($filename);
+    push(@path, splitdir($filename));
+
+    my @newpath = ('');
+    while (@path) {
+        my $dir = shift @path;
+        if ($dir eq '' or $dir eq '.') {
+            ;
+        } elsif ($dir eq '..') {
+            pop(@newpath) if @newpath > 1;
+        } else {
+            push(@newpath, $dir);
+        }
+    }
+
+    $filename = catfile(@newpath);
+    return $filename;
+}
+
+#----------------------------------------------------------------------
+# Add a mapping from source to target location
+
+sub set_map {
+    my ($self, $context, $source, $target) = @_;
+
+    $target = '' unless defined $target;
+    my $map = $context->get('map');
+
+    unless ($map) {
+        $map = {};
+        $context->set('map', $map);
+    }
+
+    $map->{$source} = $target;
+    return;
+}
+
+#----------------------------------------------------------------------
+# Add a mapping from source to target location
+
+sub set_note {
+    my ($self, $context, $name) = @_;
+
+    my $note = $context->get('note');
+
+    unless ($note) {
+        $note = {};
+        $context->set('note', $note);
+    }
+
+    $note->{$name} = 1;
+    return;
+}
+
+#----------------------------------------------------------------------
+# Write access file for password protected site
+
+sub write_access_file {
+    my ($self, $context, $directory) = @_;
+
+    $directory = $self->rel2abs($directory);
+    my $file = catfile($directory, '.htaccess');
+    my $text = $self->read_access_file($file);
+
+    my $fd = IO::File->new($file, 'w') or return;
+
+    print $fd $text;
+    print $fd DIVIDER;
+    my $note = $context->get('note');
+    foreach my $basename (keys %$note) {
+
+        print $fd <<"EOS";
+<Files "$basename.cgi">
+  AuthName "Password Required"
+  AuthType Basic
+  AuthUserFile $directory/.htpasswd
+  AuthGroupFile $directory/.htgroups
+  Require group $basename
+</Files>
+EOS
+    }
+
+    close($fd);
+    $self->change_permissions($context, $file, 'w');
+    return 1;
+}
+
+#----------------------------------------------------------------------
+# Write group file for password protected site
+
+sub write_group_file {
+    my ($self, $context, $directory) = @_;
+
+    my $file = catfile($directory, '.htgroups');
+
+    my $note = $context->get('note');
+    my $web_master = $context->get('web_master');
+
+    my $scripts = $self->read_groups_file($file, $note, $web_master);
+
+    my $fd = IO::File->new($file, 'w') or return;
+
+    foreach my $basename (keys %$scripts) {
+        my $user_list = join(' ', sort keys %{$scripts->{$basename}});
+        print $fd "$basename: $user_list\n";
+    }
+
+    close($fd);
+    $self->change_permissions($context, $file);
+
+    return;
 }
 
 #----------------------------------------------------------------------
 # Write password file
 
 sub write_password_file {
-    my ($directory, $request, $parameters)= @_;
+    my ($self, $context, $directory)= @_;
 
-    my $file = "$directory/.htpasswd";
-    my $passwords = read_password_file($file);
-    $passwords->{$request->{user}} = encrypt($request->{pass1});
-    
-    my $fd = IO::File->new($file, 'w')
-        or die "Can't open $file: $!\n";
-   
+    my $web_master = $context->get('web_master');
+    my $password = $context->get('password');
+
+    my $file = catfile($directory, '.htpasswd');
+    my $passwords = $self->read_password_file($file);
+    $passwords->{$web_master} = $password;
+
+    my $fd = IO::File->new($file, 'w') or return;
+
     foreach my $user (sort keys %$passwords) {
         my $password = $passwords->{$user};
         print $fd "$user:$password\n";
     }
 
     close($fd);
-    set_permissions($file, $parameters);  
+    $self->change_permissions($context, $file);
 
+    return;
+}
+
+#----------------------------------------------------------------------
+# A very simple command processor based around copying files
+
+package Snarf;
+
+use Cwd;
+use constant CMD_PREFIX => '#>>>';
+
+#----------------------------------------------------------------------
+# Createa new command pocessor
+
+sub new {
+    my ($pkg, $request) = @_;
+
+    my $self = bless({}, $pkg);
+    $self->{command} = SnarfCommand->new();
+    $self->{var} = $self->{command}->initialize($request);
+
+    return $self;
+}
+
+#----------------------------------------------------------------------
+# Read and processcommands in DATA sement of file
+
+sub run {
+    my ($self) = @_;
+
+    my ($read, $unread) = $self->data_readers();
+
+    while (my ($command, $lines) = $self->next_command($read, $unread)) {
+        my @args = split(' ', $command);
+        my $cmd = shift @args;
+        my $subcmd = shift @args;
+
+        $self->error("Error in command name", $command) unless defined $subcmd;
+
+        $self->error("Missing lines after command", $command)
+            if $cmd eq 'copy' && @$lines == 0;
+
+        $self->error("Unexpected lines after command", $command)
+            if $cmd ne 'copy' && @$lines > 0;
+
+        my $method = join('_', $cmd, $subcmd);
+
+        if ($cmd eq 'call') {
+            $self->error("Error in command name", $command)
+                unless defined $self->{command}->can($method);
+            $self->{command}->$method($self, @args);
+
+        } elsif ($cmd  eq 'copy') {
+           $self->error("Error in command name", $command)
+                unless defined $self->{command}->can($method);
+
+            $self->{command}->$method($self, $lines, @args);
+
+        } elsif ($cmd eq 'set') {
+            if ($self->{command}->can($method)) {
+                $self->error("No arguments for set command", $command)
+                    unless @args;
+                $self->{command}->$method($self, @args);
+
+            } else {
+                @args = ('') unless @args;
+                my $value = join(' ', @args);
+                $self->set($subcmd, $value);
+            }
+
+        } else {
+            $self->error("Error in command name", $command);
+        }
+    }
+
+    return;
+}
+
+#----------------------------------------------------------------------
+# Return closures to read the data section of this file
+
+sub data_readers {
+    my ($self) = @_;
+    my @pushback;
+
+    my $read = sub {
+        if (@pushback) {
+            return pop(@pushback);
+        } else {
+            return <DATA>;
+        }
+    };
+
+    my $unread = sub {
+        my ($line) = @_;
+        push(@pushback, $line);
+    };
+
+    return ($read, $unread);
+}
+
+#----------------------------------------------------------------------
+# Die with error
+
+sub error {
+    my ($self, $msg, $line) = @_;
+    die "$msg: " . substr($line, 0, 30) . "\n";
+}
+
+#----------------------------------------------------------------------
+# Get a value by name
+
+sub get {
+    my ($self, $name) = @_;
+
+    return unless exists $self->{var}{$name};
+    return $self->{var}{$name};
+}
+
+#----------------------------------------------------------------------
+# Is the line a command?
+
+sub is_command {
+    my ($self, $line) = @_;
+
+    my $command;
+    my $prefix = CMD_PREFIX;
+
+    if ($line =~ s/^$prefix//) {
+        $command = $line;
+        chomp $command;
+    }
+
+    return $command;
+}
+
+#----------------------------------------------------------------------
+# Get the name and contents of the next file
+
+sub next_command {
+    my ($self, $read, $unread) = @_;
+
+    my $line = $read->();
+    return unless defined $line;
+
+    my $command = $self->is_command($line);
+    die "Command not supported: $line" unless $command;
+
+    my @lines;
+    while ($line = $read->()) {
+        if ($self->is_command($line)) {
+            $unread->($line);
+            last;
+
+        } else {
+            push(@lines, $line);
+        }
+    }
+
+    return ($command, \@lines);
+}
+
+#----------------------------------------------------------------------
+# Get a value by name
+
+sub set {
+    my ($self, $name, $value) = @_;
+
+    $self->{var}{$name} = $value;
     return;
 }

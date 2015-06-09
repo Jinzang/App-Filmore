@@ -32,7 +32,9 @@ chdir $base_dir;
 $base_dir = getcwd();
 
 my $config_file = "$base_dir/config.cfg";
-my $fh = Filmore::FormHandler->new(code_ptr => 'MinMax', nonce => 707);
+my $fh = Filmore::FormHandler->new(code_ptr => 'MinMax',
+								   base_directory => $base_dir,
+								   nonce => 707);
 
 #----------------------------------------------------------------------
 # Create object

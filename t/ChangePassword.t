@@ -41,7 +41,6 @@ my %params = (
 my $cp = Filmore::ChangePassword->new(%params);
 my $ud = Filmore::UserData->new(%params);
 my $wf = Filmore::WebFile->new(%params);
-my $id = 'b9e7abb620f04132751e681d3ea4f4b6';
 
 #----------------------------------------------------------------------
 # Write files
@@ -71,19 +70,17 @@ do  {
 };
 
 #----------------------------------------------------------------------
-# Find email fom id
+# Find email fom id and check id
 
 do {
     my $email_ok = 'bar@test.com';
     my $passwords = $ud->read_password_file();
+    my $password_ok = $passwords->{$email_ok};
+    my $id = $ud->hash_string($email_ok, $password_ok);
+
     my $email = $cp->find_email($id, $passwords);
     is($email, $email_ok, "Find email from id"); # test 3
-};
 
- #----------------------------------------------------------------------
-#  Check id of object
-
-do {
     my $results= {id => $id};
     my $ok = $cp->check_id_object($results);
     is($ok, 1, "Check valid id"); # test 4

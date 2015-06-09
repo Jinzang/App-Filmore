@@ -44,11 +44,11 @@ sub parameters {
 
 sub copy_file {
     my ($self, $input_file, $output_file) = @_;
-    
+
     $input_file = $self->validate_filename($input_file, 'r');
     $output_file = $self->validate_filename($output_file, 'w');
     copy($input_file, $output_file) or die "Copy failed: $!";
-    
+
     return;
 }
 
@@ -59,7 +59,7 @@ sub create_dirs {
     my ($self, @dirs) = @_;
 
     my $path = $self->validate_filename($self->{base_directory}, 'r');
-	
+
     foreach my $dir (@dirs) {
         next if $dir eq '.';
 
@@ -83,7 +83,7 @@ sub create_dirs {
 
 sub filename_to_url {
     my ($self, $filename, $base_url) = @_;
-    
+
     $filename = rel2abs($filename);
     $filename = abs2rel($filename, $self->{base_directory});
     $base_url =~ s/\/$//;
@@ -97,7 +97,9 @@ sub filename_to_url {
 
 sub get_modtime {
     my ($self, $filename) = @_;
-    return unless -e $filename;
+
+	$filename = $self->{base_directory} unless defined $filename;
+    return 0 unless -e $filename;
 
     my @stats = stat($filename);
     my $mtime = $stats[9];
@@ -113,8 +115,9 @@ sub get_nonce {
     my ($self) = @_;
     return $self->{nonce} if $self->{nonce};
 
+	my $modtime = $self->get_modtime();
     my $nonce = time() / 24000;
-    return md5_hex($(, $nonce, $>);
+    return md5_hex($modtime, $nonce);
 }
 
 #----------------------------------------------------------------------
@@ -133,24 +136,24 @@ sub parse_url {
     } else {
         $parsed_url{method} = $method;
     }
-    
+
 
     if ($rest) {
         my ($rest, $params) = split(/\?/, $rest);
         $parsed_url{params} = $params || '';
         my @path = split(m!/!, $rest);
 
-        if (@path) { 
+        if (@path) {
             if ($path[0] =~ /\.(com|org|edu|us)$/) {
                 $parsed_url{domain} = $path[0];
                 $path[0] = '';
             }
-            
+
             $parsed_url{file} = pop(@path) if $path[-1] =~ /\./;
             $parsed_url{path} = join('/', @path);
         }
     }
-    
+
     return \%parsed_url;
 }
 
@@ -196,7 +199,7 @@ sub set_group  {
 
     my $group_id = getgrnam($self->{group});
     return unless $group_id;
-    
+
     my ($gid) = $group_id =~ /^(\d+)$/; # untaint
     return unless $gid;
 
@@ -239,12 +242,12 @@ sub sorted_files {
 
     my @sorted;
     my @augmented;
-    
+
     if ($sort_field eq 'date') {
         foreach (@unsorted) {
             push(@augmented, [-M, $_]);
         }
-				
+
     } elsif ($sort_field eq 'ext') {
         foreach (@unsorted) {
             my ($ext) = /\.([^\.]*)$/;
@@ -256,7 +259,7 @@ sub sorted_files {
     if (@augmented) {
         @augmented = sort {$a->[0] cmp $b->[0]
                    || $a->[1] cmp $b->[1]} @augmented;
-        
+
         @sorted =  map {$_->[1]} @augmented;
 
     } else {
@@ -275,7 +278,7 @@ sub split_filename {
 
     my @dirs = splitdir($filename);
     my $basename = pop(@dirs);
-    
+
     my $dir = catfile(@dirs) || '';
     return ($dir, $basename);
 }
@@ -336,7 +339,7 @@ sub url_to_filename {
     my @path = split(/\//, $parsed_url->{path});
     push(@path, $parsed_url->{file});
     my $file = catfile(@path);
-    
+
     my $base_directory = $self->{base_directory} || getcwd();
     $file = rel2abs($file, $base_directory);
 
@@ -368,10 +371,10 @@ sub validate_filename {
 sub visitor {
     my ($self, $top_dir, $sort_field) = @_;
     $sort_field = '' unless defined $sort_field;
-    
+
     my @dirlist;
     my @filelist;
-    
+
     $top_dir = $self->validate_filename($top_dir, 'r');
     push(@dirlist, $top_dir) if -e $top_dir;
 
@@ -395,7 +398,7 @@ sub visitor {
                 if (-d $newfile) {
                    push(@dirlist, $newfile);
                 } else {
-                    push(@filelist, $newfile);                    
+                    push(@filelist, $newfile);
                 }
             }
 
@@ -425,7 +428,7 @@ sub writer {
 
     # After validation, write the file
     $self->write_wo_validation($filename, $output, $binmode);
-    
+
     return;
 }
 
@@ -437,10 +440,8 @@ sub write_wo_validation{
 
     # Invalidate cache, if any
     $filename = $self->untaint_filename($filename);
-    
-    # Write file
 
-    my $modtime = $self->get_modtime($filename);
+    # Write file
 
     my $out = IO::File->new($filename, "w");
     die "Couldn't write $filename: $!" unless $out;
@@ -450,7 +451,6 @@ sub write_wo_validation{
     print $out $output if defined $output;
     close($out);
 
-    $self->set_modtime($modtime);
     $self->set_group($filename);
     chmod($self->{permissions}, $filename);
 

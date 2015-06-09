@@ -22,6 +22,7 @@ $lib = catdir(@path, 't');
 unshift(@INC, $lib);
 
 require Filmore::RequestPassword;
+require Filmore::UserData;
 require Filmore::WebFile;
 
 my $base_dir = catdir(@path, 'test');
@@ -38,8 +39,10 @@ my %params = (
               base_directory => $base_dir,
               );
 
+my $id_ok;
 my $rp = Filmore::RequestPassword->new(%params);
 my $wf = Filmore::WebFile->new(%params);
+my $ud = Filmore::UserData->new(%params);
 
 #----------------------------------------------------------------------
 # Write files
@@ -52,6 +55,11 @@ EOQ
 
     my $file = catfile($base_dir, '.htpasswd');
     $wf->write_wo_validation($file, $text);
+
+    my $email = 'bar@test.com';
+    my $passwords = $ud->read_password_file();
+    my $password = $passwords->{$email};
+    $id_ok = $ud->hash_string($email, $password);
 };
 
 #----------------------------------------------------------------------
@@ -77,7 +85,7 @@ do  {
 do {
     my $email = 'bar@test.com';
     my $id = $rp->build_id($email);
-    is($id, 'b9e7abb620f04132751e681d3ea4f4b6', "Build id string"); # test 3
+    is($id, $id_ok, "Build id string"); # test 3
 
 };
 
@@ -89,12 +97,12 @@ do {
     my $base_url = 'http://www.test.com';
     my $script_url = "$base_url/password.cgi";
 
-    my $body_ok = <<'EOQ';
-A request was made to change the password for the account bar@test.com.
+    my $body_ok = <<"EOQ";
+A request was made to change the password for the account bar\@test.com.
 on the website http://www.test.com. If you did not make this request, ignore
 this message. If you did, go to
 
-http://www.test.com/password.cgi?id=b9e7abb620f04132751e681d3ea4f4b6
+http://www.test.com/password.cgi?id=$id_ok
 
 to change your password.
 EOQ
@@ -102,7 +110,7 @@ EOQ
     my $results = {email => $email,
                    base_url => $base_url,
                    script_url => $script_url,
-                   id => 'b9e7abb620f04132751e681d3ea4f4b6'};
+                   id => $id_ok};
 
     my $mail_fields = $rp->build_mail_fields($results);
 

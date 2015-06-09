@@ -40,7 +40,9 @@ sub encrypt {
 
 sub hash_string {
     my ($self, @strings) = @_;
-    return md5_hex($(, @strings, $>);
+
+	my $modtime = $self->{webfile_ptr}->get_modtime();
+    return md5_hex($modtime, @strings);
 }
 
 #----------------------------------------------------------------------

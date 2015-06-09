@@ -1,4 +1,4 @@
-# AddUser form fields
+# Add User form fields
 name = email
 title = Email Address
 type = hidden
