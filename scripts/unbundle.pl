@@ -261,9 +261,9 @@ EOS
 }
 
 #----------------------------------------------------------------------
-# Commands that the snarf command processor will respond to
+# A very simple command processor based around copying files
 
-package SnarfCommand;
+package Snarf;
 
 use Cwd;
 use IO::File;
@@ -272,24 +272,82 @@ use File::Spec::Functions qw(catfile splitdir file_name_is_absolute);
 use constant DEFAULT_GROUP => '';
 use constant DEFAULT_PERMISSIONS => 0644;
 use constant DIVIDER => "/* Do not change code below this line */\n";
+use constant CMD_PREFIX => '#>>>';
 
 #----------------------------------------------------------------------
+# Createa new command pocessor
 
 sub new {
-    my ($pkg, %args) = @_;
+    my ($pkg, $request) = @_;
 
-    my $self = {};
-    return bless($self, $pkg);
+    my $self = bless({}, $pkg);
+    $self->initialize($request);
+
+    return $self;
+}
+
+#----------------------------------------------------------------------
+# Read and processcommands in DATA sement of file
+
+sub run {
+    my ($self) = @_;
+
+    my ($read, $unread) = $self->data_readers();
+
+    while (my ($command, $lines) = $self->next_command($read, $unread)) {
+        my @args = split(' ', $command);
+        my $cmd = shift @args;
+        my $subcmd = shift @args;
+
+        $self->error("Error in command name", $command) unless defined $subcmd;
+
+        $self->error("Missing lines after command", $command)
+            if $cmd eq 'copy' && @$lines == 0;
+
+        $self->error("Unexpected lines after command", $command)
+            if $cmd ne 'copy' && @$lines > 0;
+
+        my $method = join('_', $cmd, $subcmd);
+
+        if ($cmd eq 'call') {
+            $self->error("Error in command name", $command)
+                unless defined $self->can($method);
+            $self->$method(@args);
+
+        } elsif ($cmd  eq 'copy') {
+           $self->error("Error in command name", $command)
+                unless defined $self->can($method);
+
+            $self->$method($lines, @args);
+
+        } elsif ($cmd eq 'set') {
+            if ($self->can($method)) {
+                $self->error("No arguments for set command", $command)
+                    unless @args;
+                $self->$method(@args);
+
+            } else {
+                @args = ('') unless @args;
+                my $value = join(' ', @args);
+                $self->set($subcmd, $value);
+            }
+
+        } else {
+            $self->error("Error in command name", $command);
+        }
+    }
+
+    return;
 }
 
 #----------------------------------------------------------------------
 # Write file that blocks access to directory
 
 sub call_hide {
-    my ($self, $context, $directory) = @_;
+    my ($self, $directory) = @_;
 
     my $file = catfile($directory, '.htaccess');
-    $self->create_dirs($context, $file);
+    $self->create_dirs($file);
 
     my $fd = IO::File->new($file, 'w') or die "Couldn't write $file; $!\n";
 
@@ -304,18 +362,18 @@ order deny,allow
 EOS
 
     close($fd);
-    $self->change_permissions($context, $file);
+    $self->change_permissions($file);
 
     return;
 }
 
 #----------------------------------------------------------------------
-# Dump the context to a file, for debugging
+# Dump the structure to a file, for debugging
 
 sub call_log {
-    my ($self, $context, $file) = @_;
+    my ($self, $file) = @_;
 
-    my $dumper = Data::Dumper->new([$context], ['context']);
+    my $dumper = Data::Dumper->new([$self], ['context']);
     my $log = IO::File->new($file, 'w') or die "Couldn't open $file: $!\n";
 
     print $log $dumper->Dump();
@@ -328,12 +386,12 @@ sub call_log {
 # Protect the top directory by writing access, group and password files
 
 sub call_protect {
-    my ($self, $context) = @_;
+    my ($self) = @_;
 
     my $directory = getcwd();
-    $self->write_access_file($context, $directory);
-    $self->write_group_file($context, $directory);
-    $self->write_password_file($context, $directory);
+    $self->write_access_file($directory);
+    $self->write_group_file($directory);
+    $self->write_password_file($directory);
 
     return;
 }
@@ -358,15 +416,15 @@ sub change_group  {
 # Change permissions on a file
 
 sub change_permissions {
-    my ($self, $context, $file, $modifiers) = @_;
+    my ($self, $file, $modifiers) = @_;
     $modifiers = '' unless defined $modifiers;
 
-    my $permissions = $context->get('permissions') & 0775;
+    my $permissions = $self->get('permissions') & 0775;
     $permissions |= 0111 if $modifiers =~ /x/;
     $permissions |= 0222 if $modifiers =~ /w/;
     $permissions |= 0444 if $modifiers =~ /r/;
 
-    $self->change_group($file, $context->get('group'));
+    $self->change_group($file, $self->get('group'));
     chmod($permissions, $file);
 
     return;
@@ -376,7 +434,7 @@ sub change_permissions {
 # Copy the configuration file, noting if the command is protected
 
 sub copy_configuration {
-    my ($self, $context, $lines, $file) = @_;
+    my ($self, $lines, $file) = @_;
 
     foreach (@$lines) {
         next if /^#/ || /^\s+/;
@@ -386,23 +444,21 @@ sub copy_configuration {
 
         if ($value) {
             my $basename = $self->get_basename($file);
-            $context->{command}->set_note($context, $basename);
+            $self->set_note($basename);
         }
     }
 
-    return $self->copy_file($context, $lines, $file);
+    return $self->copy_file($lines, $file);
 }
 
 #----------------------------------------------------------------------
 # Create a copy of the input file
 
 sub copy_file {
-    my ($self, $context, $lines, $file, $mode) = @_;
+    my ($self, $lines, $file, $mode) = @_;
     $mode = 't' unless defined $mode;
 
-    $file = $self->map_filename($context, $file);
-    $self->create_dirs($context, $file);
-
+    $self->create_dirs($file);
     my $out = IO::File->new($file, 'w') or die "Couldn't write $file: $!\n";
 
     if ($mode eq 'b') {
@@ -425,31 +481,29 @@ sub copy_file {
 # Update include file and then write it
 
 sub copy_include {
-    my ($self, $context, $lines, $file) = @_;
+    my ($self, $lines, $file) = @_;
 
     foreach (@$lines) {
         next if /^#/ || /^\s+/ || ! /=/ ;
 
         my ($name, $value) = split(/\s*=\s*/, $_);
 
-        my $new_value = $context->get($name);
+        my $new_value = $self->get($name);
         $new_value= '' unless defined $new_value;
         $_ = "$name = $new_value\n" if defined $new_value;
     }
 
-    return $self->copy_file($context, $lines, $file);
+    return $self->copy_file($lines, $file);
 }
 
 #----------------------------------------------------------------------
 # Update cgi script and then write it
 
 sub copy_script {
-    my ($self, $context, $lines, $file) = @_;
+    my ($self, $lines, $file) = @_;
 
-    my $perl = $context->get('perl');
-    my $map = $context->get('map');
-    my $library = $context->get('library');
-    $library = $self->map_filename($context, $library);
+    my $perl = $self->get('perl');
+    my $library = $self->get('library');
 
     foreach (@$lines) {
         # Change shebang line
@@ -458,8 +512,8 @@ sub copy_script {
         s/^use lib \'(\S+)\'/use lib \'$library\'/;
     }
 
-    my $status = $self->copy_file($context, $lines, $file);
-    $self->change_permissions($context, $file, 'x') if $status;
+    my $status = $self->copy_file($lines, $file);
+    $self->change_permissions($file, 'x') if $status;
 
     return $status;
 }
@@ -468,7 +522,7 @@ sub copy_script {
 # Check path and create directories as necessary
 
 sub create_dirs {
-    my ($self, $context, $file) = @_;
+    my ($self, $file) = @_;
 
     my @dirs = splitdir($file);
     pop @dirs;
@@ -480,11 +534,34 @@ sub create_dirs {
 
         if (! -d $path) {
             mkdir ($path) or die "Couldn't create $path: $!\n";
-            $self->change_permissions($context, $path, 'x')
+            $self->change_permissions($path, 'x')
         }
     }
 
     return;
+}
+
+#----------------------------------------------------------------------
+# Return closures to read the data section of this file
+
+sub data_readers {
+    my ($self) = @_;
+    my @pushback;
+
+    my $read = sub {
+        if (@pushback) {
+            return pop(@pushback);
+        } else {
+            return <DATA>;
+        }
+    };
+
+    my $unread = sub {
+        my ($line) = @_;
+        push(@pushback, $line);
+    };
+
+    return ($read, $unread);
 }
 
 #----------------------------------------------------------------------
@@ -495,6 +572,14 @@ sub encrypt {
 
 	my $salt = join '', ('.', '/', 0..9, 'A'..'Z', 'a'..'z')[rand 64, rand 64];
     return crypt($plain, $salt);
+}
+
+#----------------------------------------------------------------------
+# Die with error
+
+sub error {
+    my ($self, $msg, $line) = @_;
+    die "$msg: " . substr($line, 0, 30) . "\n";
 }
 
 #----------------------------------------------------------------------
@@ -512,6 +597,16 @@ sub find_sendmail {
     chomp $path;
 
     return $path || '';
+}
+
+#----------------------------------------------------------------------
+# Get a value by name
+
+sub get {
+    my ($self, $name) = @_;
+
+    return unless exists $self->{$name};
+    return $self->{$name};
 }
 
 #----------------------------------------------------------------------
@@ -548,55 +643,66 @@ sub initialize {
     my ($self, $request) = @_;
 
     my $base_directory = getcwd();
-    my $base_url = $self->get_base_url($request);
+    $self->{base_url} = $self->get_base_url($request);
 
-    my $sendmail = $self->find_sendmail();
-    my $password = $self->encrypt($request->{pass1});
+    $self->{sendmail_command} = $self->find_sendmail();
+    $self->{password} = $self->encrypt($request->{pass1});
 
-    my $perl = `/usr/bin/which perl`;
-    chomp $perl;
+    $self->{perl}  = `/usr/bin/which perl`;
+    chomp $self->{perl};
 
     # Set reasonable defaults for parameters
 
-    my $variables = {
-                     group => DEFAULT_GROUP,
-                     permissions => DEFAULT_PERMISSIONS,
-                     perl => $perl,
-                     base_directory => $base_directory,
-                     base_url => $base_url,
-                     sendmail_command => $sendmail,
-                     password => $password,
-                     valid_read => [$base_directory],
-                     web_master => $request->{user},
-                    };
+    $self->{group} = DEFAULT_GROUP;
+    $self->{permissions} = DEFAULT_PERMISSIONS;
+    $self->{base_directory} = $base_directory;
+    $self->{valid_read} = [$base_directory];
+    $self->{web_master} = $request->{user};
 
-    return $variables;
+    return;
 }
 
 #----------------------------------------------------------------------
-# Map filename to name on uploaded system
+# Is the line a command?
 
-sub map_filename {
-    my ($self, $context, $file) = @_;
+sub is_command {
+    my ($self, $line) = @_;
 
-    my $map = $context->get('map');
-    if ($map) {
-        my @path = splitdir($file);
-        my $dir = shift(@path);
+    my $command;
+    my $prefix = CMD_PREFIX;
 
-        if (exists $map->{$dir}) {
-            if ($map->{$dir}) {
-                unshift(@path, $map->{$dir});
-            }
-
-        } else {
-            unshift(@path, $dir);
-        }
-
-        $file = catfile(@path);
+    if ($line =~ s/^$prefix//) {
+        $command = $line;
+        chomp $command;
     }
 
-    return $file;
+    return $command;
+}
+
+#----------------------------------------------------------------------
+# Get the name and contents of the next file
+
+sub next_command {
+    my ($self, $read, $unread) = @_;
+
+    my $line = $read->();
+    return unless defined $line;
+
+    my $command = $self->is_command($line);
+    die "Command not supported: $line" unless $command;
+
+    my @lines;
+    while ($line = $read->()) {
+        if ($self->is_command($line)) {
+            $unread->($line);
+            last;
+
+        } else {
+            push(@lines, $line);
+        }
+    }
+
+    return ($command, \@lines);
 }
 
 #----------------------------------------------------------------------
@@ -745,20 +851,12 @@ sub rel2abs {
 }
 
 #----------------------------------------------------------------------
-# Add a mapping from source to target location
+# Get a value by name
 
-sub set_map {
-    my ($self, $context, $source, $target) = @_;
+sub set {
+    my ($self, $name, $value) = @_;
 
-    $target = '' unless defined $target;
-    my $map = $context->get('map');
-
-    unless ($map) {
-        $map = {};
-        $context->set('map', $map);
-    }
-
-    $map->{$source} = $target;
+    $self->{$name} = $value;
     return;
 }
 
@@ -766,13 +864,13 @@ sub set_map {
 # Add a mapping from source to target location
 
 sub set_note {
-    my ($self, $context, $name) = @_;
+    my ($self, $name) = @_;
 
-    my $note = $context->get('note');
+    my $note = $self->get('note');
 
     unless ($note) {
         $note = {};
-        $context->set('note', $note);
+        $self->set('note', $note);
     }
 
     $note->{$name} = 1;
@@ -783,7 +881,7 @@ sub set_note {
 # Write access file for password protected site
 
 sub write_access_file {
-    my ($self, $context, $directory) = @_;
+    my ($self, $directory) = @_;
 
     $directory = $self->rel2abs($directory);
     my $file = catfile($directory, '.htaccess');
@@ -793,7 +891,7 @@ sub write_access_file {
 
     print $fd $text;
     print $fd DIVIDER;
-    my $note = $context->get('note');
+    my $note = $self->get('note');
     foreach my $basename (keys %$note) {
 
         print $fd <<"EOS";
@@ -808,7 +906,7 @@ EOS
     }
 
     close($fd);
-    $self->change_permissions($context, $file, 'w');
+    $self->change_permissions($file, 'w');
     return 1;
 }
 
@@ -816,12 +914,12 @@ EOS
 # Write group file for password protected site
 
 sub write_group_file {
-    my ($self, $context, $directory) = @_;
+    my ($self, $directory) = @_;
 
     my $file = catfile($directory, '.htgroups');
 
-    my $note = $context->get('note');
-    my $web_master = $context->get('web_master');
+    my $note = $self->get('note');
+    my $web_master = $self->get('web_master');
 
     my $scripts = $self->read_groups_file($file, $note, $web_master);
 
@@ -833,7 +931,7 @@ sub write_group_file {
     }
 
     close($fd);
-    $self->change_permissions($context, $file);
+    $self->change_permissions($file);
 
     return;
 }
@@ -842,10 +940,10 @@ sub write_group_file {
 # Write password file
 
 sub write_password_file {
-    my ($self, $context, $directory)= @_;
+    my ($self, $directory)= @_;
 
-    my $web_master = $context->get('web_master');
-    my $password = $context->get('password');
+    my $web_master = $self->get('web_master');
+    my $password = $self->get('password');
 
     my $file = catfile($directory, '.htpasswd');
     my $passwords = $self->read_password_file($file);
@@ -859,176 +957,7 @@ sub write_password_file {
     }
 
     close($fd);
-    $self->change_permissions($context, $file);
+    $self->change_permissions($file);
 
-    return;
-}
-
-#----------------------------------------------------------------------
-# A very simple command processor based around copying files
-
-package Snarf;
-
-use Cwd;
-use constant CMD_PREFIX => '#>>>';
-
-#----------------------------------------------------------------------
-# Createa new command pocessor
-
-sub new {
-    my ($pkg, $request) = @_;
-
-    my $self = bless({}, $pkg);
-    $self->{command} = SnarfCommand->new();
-    $self->{var} = $self->{command}->initialize($request);
-
-    return $self;
-}
-
-#----------------------------------------------------------------------
-# Read and processcommands in DATA sement of file
-
-sub run {
-    my ($self) = @_;
-
-    my ($read, $unread) = $self->data_readers();
-
-    while (my ($command, $lines) = $self->next_command($read, $unread)) {
-        my @args = split(' ', $command);
-        my $cmd = shift @args;
-        my $subcmd = shift @args;
-
-        $self->error("Error in command name", $command) unless defined $subcmd;
-
-        $self->error("Missing lines after command", $command)
-            if $cmd eq 'copy' && @$lines == 0;
-
-        $self->error("Unexpected lines after command", $command)
-            if $cmd ne 'copy' && @$lines > 0;
-
-        my $method = join('_', $cmd, $subcmd);
-
-        if ($cmd eq 'call') {
-            $self->error("Error in command name", $command)
-                unless defined $self->{command}->can($method);
-            $self->{command}->$method($self, @args);
-
-        } elsif ($cmd  eq 'copy') {
-           $self->error("Error in command name", $command)
-                unless defined $self->{command}->can($method);
-
-            $self->{command}->$method($self, $lines, @args);
-
-        } elsif ($cmd eq 'set') {
-            if ($self->{command}->can($method)) {
-                $self->error("No arguments for set command", $command)
-                    unless @args;
-                $self->{command}->$method($self, @args);
-
-            } else {
-                @args = ('') unless @args;
-                my $value = join(' ', @args);
-                $self->set($subcmd, $value);
-            }
-
-        } else {
-            $self->error("Error in command name", $command);
-        }
-    }
-
-    return;
-}
-
-#----------------------------------------------------------------------
-# Return closures to read the data section of this file
-
-sub data_readers {
-    my ($self) = @_;
-    my @pushback;
-
-    my $read = sub {
-        if (@pushback) {
-            return pop(@pushback);
-        } else {
-            return <DATA>;
-        }
-    };
-
-    my $unread = sub {
-        my ($line) = @_;
-        push(@pushback, $line);
-    };
-
-    return ($read, $unread);
-}
-
-#----------------------------------------------------------------------
-# Die with error
-
-sub error {
-    my ($self, $msg, $line) = @_;
-    die "$msg: " . substr($line, 0, 30) . "\n";
-}
-
-#----------------------------------------------------------------------
-# Get a value by name
-
-sub get {
-    my ($self, $name) = @_;
-
-    return unless exists $self->{var}{$name};
-    return $self->{var}{$name};
-}
-
-#----------------------------------------------------------------------
-# Is the line a command?
-
-sub is_command {
-    my ($self, $line) = @_;
-
-    my $command;
-    my $prefix = CMD_PREFIX;
-
-    if ($line =~ s/^$prefix//) {
-        $command = $line;
-        chomp $command;
-    }
-
-    return $command;
-}
-
-#----------------------------------------------------------------------
-# Get the name and contents of the next file
-
-sub next_command {
-    my ($self, $read, $unread) = @_;
-
-    my $line = $read->();
-    return unless defined $line;
-
-    my $command = $self->is_command($line);
-    die "Command not supported: $line" unless $command;
-
-    my @lines;
-    while ($line = $read->()) {
-        if ($self->is_command($line)) {
-            $unread->($line);
-            last;
-
-        } else {
-            push(@lines, $line);
-        }
-    }
-
-    return ($command, \@lines);
-}
-
-#----------------------------------------------------------------------
-# Get a value by name
-
-sub set {
-    my ($self, $name, $value) = @_;
-
-    $self->{var}{$name} = $value;
     return;
 }

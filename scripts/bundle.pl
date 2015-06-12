@@ -9,7 +9,7 @@ use lib "$Bin/../lib";
 use IO::File;
 use IO::Dir;
 use MIME::Base64  qw(encode_base64);
-use File::Spec::Functions qw(catfile no_upwards);
+use File::Spec::Functions qw(catfile no_upwards splitdir);
 
 use constant CMD_PREFIX => '#>>>';
 
@@ -42,10 +42,9 @@ die "Can't write to $output: $!\n" unless $out;
 chdir("$Bin/..") or die "Couldn't cd to $Bin directory\n";
 
 copy_script($out, $script);
-include_dirs($out, $include);
+print $out CMD_PREFIX, "set library $library\n";
 
 my $visitor = get_visitor($include);
-
 while (my $file = &$visitor) {
     bundle_file($include, $types, $out, $file);
 }
@@ -105,7 +104,9 @@ sub bundle_file {
     $type = $types->{$ext} if defined $ext && exists $types->{$ext};
 
     my $bin = -B $file ? 'b' : 't';
-    print $out CMD_PREFIX, "copy $type $file $bin\n";
+    my $outfile = map_filename($mapping, $file);
+
+    print $out CMD_PREFIX, "copy $type $outfile $bin\n";
 
     if ($bin eq 'b') {
         append_binary_file($out, $file);
@@ -163,17 +164,25 @@ sub get_visitor {
 }
 
 #----------------------------------------------------------------------
-# Save names of directories to output file
+# Map filename to name on uploaded system
 
-sub include_dirs {
-    my ($out, $include) = @_;
+sub map_filename {
+    my ($mapping, $file) = @_;
 
-    while (my ($source, $target) = each %$include) {
-        print $out CMD_PREFIX, "set map $source $target\n";
+    my @path = splitdir($file);
+    my $dir = shift(@path);
+
+    if (exists $mapping->{$dir}) {
+        if ($mapping->{$dir}) {
+            unshift(@path, $mapping->{$dir});
+        }
+
+    } else {
+        unshift(@path, $dir);
     }
 
-    print $out CMD_PREFIX, "set library $library\n";
-    return;
+    $file = catfile(@path);
+    return $file;
 }
 
 #----------------------------------------------------------------------
